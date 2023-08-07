@@ -21,19 +21,17 @@ def sleep_key(sec, exit_key_code = 0x3A-40, stop = True):
             return
 
 def paste_in_chat(txt_msg, keys):
-    #print(win32api.VkKeyScan('t'))
+    shift_symbols = {'!','@','#','$','%','^','&','*','(',')','{','}','"',':','_','+','<','>','?','~'}
     while not(is_key_pressed(keys['RLAC_END'])):
         uppercase_flag = 1
-        
         sleep_key(0.001)
-                   
         win32api.keybd_event(keys['TEXT_CHAT'], 0, 0, 0)
         sleep_key(0.00001)
         win32api.keybd_event(keys['TEXT_CHAT'], 0, win32con.KEYEVENTF_KEYUP, 0)
         sleep_key(0.012) # Safe value
         
         for letter in txt_msg:
-            if uppercase_flag == 1 or letter in '!?@#$%^&*()_+><:"}{~':
+            if uppercase_flag == 1 or letter in shift_symbols or letter.isupper():
                 # Shift key = 0x10
                 win32api.keybd_event(keys['SHIFT'], 0, 0, 0)
                 sleep_key(0.00001, keys['RLAC_END'], stop = False)
@@ -62,28 +60,23 @@ def paste_in_chat(txt_msg, keys):
 def second_click(first, keys, msgs):
     start_time = time.time()
     while True:
-        if is_key_pressed(keys['INFORMATION(TEAM)']):
-            win32api.keybd_event(keys['INFORMATION(TEAM)'], 0, win32con.KEYEVENTF_KEYUP, 0)
-            paste_in_chat(msgs[first][0], keys)
-            return
-        elif is_key_pressed(keys['COMPLIMENTS']):
-            win32api.keybd_event(keys['COMPLIMENTS'], 0, win32con.KEYEVENTF_KEYUP, 0)
-            paste_in_chat(msgs[first][1], keys)
-            return
-        elif is_key_pressed(keys['REACTIONS']):
-            win32api.keybd_event(keys['REACTIONS'], 0, win32con.KEYEVENTF_KEYUP, 0)
-            paste_in_chat(msgs[first][2], keys)
-            return
-        elif is_key_pressed(keys['APOLOGIES']):
-            win32api.keybd_event(keys['APOLOGIES'], 0, win32con.KEYEVENTF_KEYUP, 0)
-            paste_in_chat(msgs[first][3], keys)
-            return
+        any_key_pressed = [
+            is_key_pressed(keys['INFORMATION(TEAM)']),
+            is_key_pressed(keys['COMPLIMENTS']),
+            is_key_pressed(keys['REACTIONS']),
+            is_key_pressed(keys['APOLOGIES'])
+        ]
+        if any(any_key_pressed):
+            key_pressed = any_key_pressed.index(True)
+            win32api.keybd_event(0x31 + key_pressed, 0, win32con.KEYEVENTF_KEYUP, 0)
+            paste_in_chat(msgs[first][key_pressed], keys)
+            
 
         # ExitKey pressed during the loop? - exit the entire program
         if is_key_pressed(keys['RLAC_END']):
             sys.exit()
 
-
+        # Check the timer
         current_time = time.time()
         elapsed_time = current_time - start_time
 
@@ -97,43 +90,27 @@ def main():
             'Dear mate, let me take that kickoff!',
             'Please mate, take that shot!',
             "I'm here!",
-            'I will defend for you!'],
+            'I will defend for you!'
+            ],
         [
             'Dddaaamn! That shot!',
-            'Incredible shot!',
+            'Incredible pass!',
             'Thanks a lot!',
             'Bruh, that save as shitty as your skill!'
-        ],
+            ],
         [
             'That one was close enough',
             'NIEN! NIEN! NIEN!',
-            'Whata heeeel',
-            'I was calculating that for years'
-        ],
+            'Holy Wow!',
+            'I was calculating that for years!'
+            ],
         [
             'Okay...',
             'No problema, noob',
             'Oops, that is your mistake',
-            'Im not sorry. Sorry'
-        ]]
-    # text_messages = {
-    #     '1-1': 'Dear mate, let me take that kickoff!',
-    #     '1-2': 'Please mate, take that shot!',
-    #     '1-3': '',
-    #     '1-4': '',
-    #     '2-1': '',
-    #     '2-2': '',
-    #     '2-3': '',
-    #     '2-4': '',
-    #     '3-1': '',
-    #     '3-2': '',
-    #     '3-3': '',
-    #     '3-4': '',
-    #     '4-1': '',
-    #     '4-2': '',
-    #     '4-3': '',
-    #     '4-4': ''
-    #     }
+            "I'm not sorry. Sorry"
+            ]
+        ]
 
     # You can whatch them in that table:
     # https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
@@ -141,6 +118,7 @@ def main():
         'RLAC_START': 0x70,
         'RLAC_END': 0x71,
         'TEXT_CHAT': 0x54,
+        'TEXT_CHAT_PARTY': 0x59,
         'INFORMATION(TEAM)': 0x31,
         'COMPLIMENTS': 0x32,
         'REACTIONS': 0x33,
@@ -154,22 +132,21 @@ def main():
         pass
     win32api.keybd_event(key_bindings['RLAC_START'], 0, win32con.KEYEVENTF_KEYUP, 0)
 
-    while True:
-        if is_key_pressed(key_bindings['INFORMATION(TEAM)']):
-            win32api.keybd_event(key_bindings['INFORMATION(TEAM)'], 0, win32con.KEYEVENTF_KEYUP, 0)
-            second_click(0,key_bindings, text_messages)
-            
-        elif is_key_pressed(key_bindings['COMPLIMENTS']):
-            win32api.keybd_event(key_bindings['COMPLIMENTS'], 0, win32con.KEYEVENTF_KEYUP, 0)
-            second_click(1,key_bindings, text_messages)
 
-        elif is_key_pressed(key_bindings['REACTIONS']):
-            win32api.keybd_event(key_bindings['REACTIONS'], 0, win32con.KEYEVENTF_KEYUP, 0)
-            second_click(2,key_bindings, text_messages)
+    while True:
+        any_key_pressed = [
+            is_key_pressed(key_bindings['INFORMATION(TEAM)']),
+            is_key_pressed(key_bindings['COMPLIMENTS']),
+            is_key_pressed(key_bindings['REACTIONS']),
+            is_key_pressed(key_bindings['APOLOGIES'])
+        ]
+
+        if any(any_key_pressed):
+            key_pressed = any_key_pressed.index(True)
+            win32api.keybd_event(0x31 + key_pressed, 0, win32con.KEYEVENTF_KEYUP, 0)
+            second_click(key_pressed, key_bindings, text_messages)
             
-        elif is_key_pressed(key_bindings['APOLOGIES']):
-            win32api.keybd_event(key_bindings['APOLOGIES'], 0, win32con.KEYEVENTF_KEYUP, 0)
-            second_click(3,key_bindings, text_messages)
+
 
 if __name__ =='__main__':
     
