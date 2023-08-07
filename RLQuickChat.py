@@ -5,12 +5,13 @@ import time
 def is_key_pressed(key):
     return ctypes.windll.user32.GetAsyncKeyState(key) & 0x8000 != 0
 
-def sleep_key(sec, exit_key_code = 0x3A-40, stop = True):
+def sleep_key(sec, exit_key_code = 0x71, stop = True):
     start_time = time.time()
     
     while True:
         # ExitKey pressed during the loop? - exit the entire program
         if is_key_pressed(exit_key_code) and stop:
+            print('Im out sys3')
             sys.exit()
 
         current_time = time.time()
@@ -20,14 +21,19 @@ def sleep_key(sec, exit_key_code = 0x3A-40, stop = True):
         if elapsed_time >= sec:
             return
 
-def paste_in_chat(txt_msg, keys):
+def paste_in_chat(txt_msg, keys, chat):
     shift_symbols = {'!','@','#','$','%','^','&','*','(',')','{','}','"',':','_','+','<','>','?','~'}
     while not(is_key_pressed(keys['RLAC_END'])):
         uppercase_flag = 1
+        if chat:
+            chat_type = keys['TEXT_CHAT']
+        else:
+            chat_type = keys['TEXT_CHAT_PARTY']
+        
         sleep_key(0.001)
-        win32api.keybd_event(keys['TEXT_CHAT'], 0, 0, 0)
+        win32api.keybd_event(chat_type, 0, 0, 0)
         sleep_key(0.00001)
-        win32api.keybd_event(keys['TEXT_CHAT'], 0, win32con.KEYEVENTF_KEYUP, 0)
+        win32api.keybd_event(chat_type, 0, win32con.KEYEVENTF_KEYUP, 0)
         sleep_key(0.012) # Safe value
         
         for letter in txt_msg:
@@ -66,14 +72,11 @@ def second_click(first, keys, msgs):
             is_key_pressed(keys['REACTIONS']),
             is_key_pressed(keys['APOLOGIES'])
         ]
-        if any(any_key_pressed):
-            key_pressed = any_key_pressed.index(True)
-            win32api.keybd_event(0x31 + key_pressed, 0, win32con.KEYEVENTF_KEYUP, 0)
-            paste_in_chat(msgs[first][key_pressed], keys)
             
 
         # ExitKey pressed during the loop? - exit the entire program
         if is_key_pressed(keys['RLAC_END']):
+            print('Im out sys2')
             sys.exit()
 
         # Check the timer
@@ -83,6 +86,13 @@ def second_click(first, keys, msgs):
         # If the time has run out, exit the loop
         if elapsed_time >= 2.5:
             return
+        
+        if any(any_key_pressed):
+            key_pressed = any_key_pressed.index(True)
+            win32api.keybd_event(keys['INFORMATION(TEAM)'] + key_pressed, 0, win32con.KEYEVENTF_KEYUP, 0)
+            paste_in_chat(msgs[first][key_pressed], keys, first)
+            return
+        
 
 def main():
     text_messages =[
@@ -143,11 +153,14 @@ def main():
 
         if any(any_key_pressed):
             key_pressed = any_key_pressed.index(True)
-            win32api.keybd_event(0x31 + key_pressed, 0, win32con.KEYEVENTF_KEYUP, 0)
+            win32api.keybd_event(key_bindings['INFORMATION(TEAM)'] + key_pressed, 0, win32con.KEYEVENTF_KEYUP, 0)
             second_click(key_pressed, key_bindings, text_messages)
-            
-
+        sleep_key(0.1)
+        if is_key_pressed(key_bindings['RLAC_END']):
+            print('Im out sys1')
+            sys.exit()
 
 if __name__ =='__main__':
     
     main()
+    print('Im out main')
