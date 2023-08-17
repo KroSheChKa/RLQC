@@ -7,6 +7,7 @@
 
 ## How to install, customize and launch
 
+
 Installation
 ---
 A few steps:
