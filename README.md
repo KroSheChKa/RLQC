@@ -3,7 +3,7 @@
 ❌~~What a save!~~\
 ❌~~What a save!~~\
 ✔️Here's the code for practicing saves: 2E68-0A19-F54F-D41F\
-✔️No cap bro you didn't make it...
+✔️Nice shot! If you were aiming for the bleachers!
 
 ## How to install, customize and launch
 
@@ -74,10 +74,10 @@ You are free to build friendly relationships with your mates and opponents ;)
 
 ## Need to add/fix
 - [ ] **Add** gamepad support
-- [ ] **Add** random messages. + new ones
-- [ ] **Add** variety of messages
+- [x] **Add** random messages. + new ones
+- [x] **Add** variety of messages
 - [ ] **Fix:** A message in chat leads to forgetting the keys pressed at that moment, which interferes with gameplay
-- [ ] **Fix:** Last click falsely remembering the last click results in an incorrect follow-up message
+- [x] **Fix:** Last click falsely remembering the last click results in an incorrect follow-up message
 
 ---
   
