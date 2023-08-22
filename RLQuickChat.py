@@ -2,64 +2,13 @@ import sys
 import ctypes
 from win32api import keybd_event, VkKeyScan
 import time
-
-"""----------------------- Constants -----------------------"""
-
-quick_chat_messages = [
-        [
-            'Dear mate, let me take that kickoff!',
-            'Please mate, take that shot!',
-            "I'm here!",
-            'I will defend for you!'
-            ],
-        [
-            'Dddaaamn! That shot!',
-            'Incredible pass!',
-            'Thanks a lot!',
-            'Bruh, that save as shitty as your skill!'
-            ],
-        [
-            'That one was close enough.',
-            'NIEN! NIEN! NIEN!',
-            'Holy Wow!',
-            'I was calculating that for years!'
-            ],
-        [
-            'Okay...',
-            'No problema, noob.',
-            'Oops, that is your mistake.',
-            "I'm not sorry. Sorry."
-            ]
-        ]
-
-# Values set due that table:
-# https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
-key_bindings = {
-        'RLAC_START': 0x70,
-        'RLAC_END': 0x71,
-        'TEXT_CHAT_ALL': 0x54,
-        'TEXT_CHAT_PARTY': 0x59,
-        'INFORMATION(TEAM)': 0x31,
-        'COMPLIMENTS': 0x32,
-        'REACTIONS': 0x33,
-        'APOLOGIES': 0x34,
-        'SHIFT': 0x10,
-        'ENTER': 0x0D
-        }
-
-# Symbols that need to be printed with shift pressed
-shift_symbols = {
-            '!','@','#','$','%','^','&','*','(',')',
-            '{','}','"',':','_','+','<','>','?','~'
-            }
-
-KEYEVENTF_KEYUP = 0x0002
-
-"""---------------------------------------------------------"""
+from config import *
+from random import choice
 
 # Check whether the key is pressed
 def is_key_pressed(key):
-    return ctypes.windll.user32.GetAsyncKeyState(key) & 0x8000 != 0
+    return ctypes.windll.user32.GetKeyState(key) & 0x8000 != 0
+    #return ctypes.windll.user32.GetAsyncKeyState(key) & 0x8000 != 0
 
 
 def safe_exit():
@@ -76,8 +25,8 @@ def sleep_key(sec):
     while True:
         # ExitKey pressed during the loop? - exit the entire program
         if is_key_pressed(key_bindings['RLAC_END']):
-            print('Im out sys3')
             safe_exit()
+
 
         current_time = time.time()
         elapsed_time = current_time - start_time
@@ -85,6 +34,14 @@ def sleep_key(sec):
         # If the time has run out, exit the loop
         if elapsed_time >= sec:
             return
+
+
+def save_latest_keys():
+    list_of_pressed_keys = []
+    for key_name, key_code in active_RL_keyboard_keys.items():
+        if is_key_pressed(key_code):
+            list_of_pressed_keys.append(key_name)
+    return list_of_pressed_keys
 
 
 # Quickly typing message in chat
@@ -126,7 +83,6 @@ def paste_in_chat(txt_msg, chat):
                 # Release shift
                 keybd_event(key_bindings['SHIFT'], 0, KEYEVENTF_KEYUP, 0)
 
-                continue
 
             # Else just press like a usuall button
             else:
@@ -158,7 +114,6 @@ def second_click(first_click):
         
         # ExitKey pressed during the loop? - exit the entire program
         if is_key_pressed(key_bindings['RLAC_END']):
-            print('Im out sys2')
             safe_exit()
 
         # Check the timer
@@ -166,16 +121,23 @@ def second_click(first_click):
         elapsed_time = current_time - start_time
 
         # If the time has run out, exit the loop
-        if elapsed_time >= 2.5:
+        if elapsed_time >= WAIT_TIME_SECOND_CLICK:
             return
         
         # Type corresponding message if pressed button
         if any(any_key_pressed):
             key_pressed = any_key_pressed.index(True)
-            keybd_event(key_bindings['INFORMATION(TEAM)'] + key_pressed,
-                        0, KEYEVENTF_KEYUP, 0)
-            paste_in_chat(quick_chat_messages[first_click][key_pressed],
+            keybd_event(key_bindings['INFORMATION(TEAM)'] + key_pressed, 0, KEYEVENTF_KEYUP, 0)
+
+            # Save the latest pressed buttons before the typing in chat
+            list_of_pressed_keys = save_latest_keys()
+
+            paste_in_chat(choice(quick_chat_messages[first_click][key_pressed]),
                           first_click)
+
+            # Press again the keys
+            for key_name in list_of_pressed_keys:
+                keybd_event(active_RL_keyboard_keys[key_name], 0, 0, 0)
             return
 
 
@@ -203,10 +165,9 @@ def main():
 
         # Check wether the exit button pressed
         if is_key_pressed(key_bindings['RLAC_END']):
-            print('Im out sys1')
             safe_exit()
 
-        sleep_key(0.1)
+        sleep_key(0.01)
 
 
 if __name__ =='__main__':
