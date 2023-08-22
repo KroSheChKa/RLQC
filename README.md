@@ -20,7 +20,7 @@ git clone https://github.com/KroSheChKa/RLQC.git
 
 Customize
 ---
-If you have modified default values in the Rocket League, you should go to the root of the file `RLQuickChat.py` and change the corresponding values.
+If you have modified default values in the Rocket League, you should go to the root of the file `config.py` and change the corresponding values.
 
 Key values you can find in [this table](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
 ```python
@@ -73,14 +73,17 @@ Launching
 You are free to build friendly relationships with your mates and opponents ;)
 
 ## Need to add/fix
+- [ ] **Add** randomized training codes in certain message
 - [ ] **Add** gamepad support
 - [x] **Add** random messages. + new ones
 - [x] **Add** variety of messages
 - [ ] **Fix:** A message in chat leads to forgetting the keys pressed at that moment, which interferes with gameplay
 - [x] **Fix:** Last click falsely remembering the last click results in an incorrect follow-up message
+- [ ] **Fix** the issue when two messages combine in one
+- [ ] **Fix** rarely missing symbols
 
 ---
   
 *Any suggestions? You found a flaw?*
 
--> Welcome to [Discussions](https://github.com/KroSheChKa/SteamEmoticonsFilter/discussions)
+-> Welcome to [Discussions](https://github.com/KroSheChKa/RLQC/discussions)
