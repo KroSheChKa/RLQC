@@ -27,7 +27,6 @@ def sleep_key(sec):
         if is_key_pressed(key_bindings['RLAC_END']):
             safe_exit()
 
-
         current_time = time.time()
         elapsed_time = current_time - start_time
         
@@ -42,60 +41,6 @@ def save_latest_keys():
         if is_key_pressed(key_code):
             list_of_pressed_keys.append(key_name)
     return list_of_pressed_keys
-
-
-# Quickly typing message in chat
-def paste_in_chat(txt_msg, chat):
-    while not(is_key_pressed(key_bindings['RLAC_END'])):
-        
-        # Determine in what chat we need to type
-        if chat:
-            chat_type = key_bindings['TEXT_CHAT_ALL']
-        else:
-            chat_type = key_bindings['TEXT_CHAT_PARTY']
-        
-        # Open the chat
-        sleep_key(0.001)
-        keybd_event(chat_type, 0, 0, 0)
-        sleep_key(0.00001)
-        keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
-        sleep_key(0.012)
-        
-        # Iterate each lette in text message
-        for letter in txt_msg:
-
-            # Get the code of
-            letter_VK = VkKeyScan(letter)
-
-            # Check if the key needs to be written with the shift key
-            if letter in shift_symbols or letter.isupper():
-
-                # Press and hold shift
-                keybd_event(key_bindings['SHIFT'], 0, 0, 0)
-                sleep_key(0.00001)
-
-                # Click button that needed shift
-                keybd_event(letter_VK, 0, 0, 0)
-                sleep_key(0.00001)
-                keybd_event(letter_VK, 0, KEYEVENTF_KEYUP, 0)
-                sleep_key(0.00001)
-
-                # Release shift
-                keybd_event(key_bindings['SHIFT'], 0, KEYEVENTF_KEYUP, 0)
-
-
-            # Else just press like a usuall button
-            else:
-                keybd_event(letter_VK, 0, 0, 0)
-                sleep_key(0.00001)
-                keybd_event(letter_VK, 0, KEYEVENTF_KEYUP, 0)
-
-        # Successfully send the message by pressing enter
-        keybd_event(key_bindings['ENTER'], 0, 0, 0)
-        sleep_key(0.0001)
-        keybd_event(key_bindings['ENTER'], 0, KEYEVENTF_KEYUP, 0)
-
-        return
 
 
 # Expecting a second click after the first
@@ -132,13 +77,77 @@ def second_click(first_click):
             # Save the latest pressed buttons before the typing in chat
             list_of_pressed_keys = save_latest_keys()
 
-            paste_in_chat(choice(quick_chat_messages[first_click][key_pressed]),
-                          first_click)
+            # Text that should be typed in chat
+            text_message = choice(quick_chat_messages[first_click][key_pressed])
+
+            # Check whether we need to add map codes
+            if text_message == quick_chat_2_1[0]:
+                text_message = text_message + choice(shooting_trainig_map_codes)
+            elif text_message == quick_chat_2_4[0]:
+                text_message = text_message + choice(defence_trainig_map_codes)
+            
+            # Type the message in chat
+            paste_in_chat(text_message, first_click)
 
             # Press again the keys
             for key_name in list_of_pressed_keys:
                 keybd_event(active_RL_keyboard_keys[key_name], 0, 0, 0)
             return
+
+
+# Quickly typing message in chat
+def paste_in_chat(txt_msg, chat):
+    while not(is_key_pressed(key_bindings['RLAC_END'])):
+        
+        # Determine in what chat we need to type
+        if chat:
+            chat_type = key_bindings['TEXT_CHAT_ALL']
+        else:
+            chat_type = key_bindings['TEXT_CHAT_PARTY']
+        
+        # Open the chat
+        sleep_key(0.001)
+        keybd_event(chat_type, 0, 0, 0)
+        sleep_key(0.00001)
+        keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
+        sleep_key(0.012)
+        
+
+        # Iterate each lette in text message
+        for letter in txt_msg:
+
+            # Get the code of
+            letter_VK = VkKeyScan(letter)
+
+            # Check if the key needs to be written with the shift key
+            if letter in shift_symbols or letter.isupper():
+
+                # Press and hold shift
+                keybd_event(key_bindings['SHIFT'], 0, 0, 0)
+                sleep_key(0.00001)
+
+                # Click button that needed shift
+                keybd_event(letter_VK, 0, 0, 0)
+                sleep_key(0.00001)
+                keybd_event(letter_VK, 0, KEYEVENTF_KEYUP, 0)
+                sleep_key(0.00001)
+
+                # Release shift
+                keybd_event(key_bindings['SHIFT'], 0, KEYEVENTF_KEYUP, 0)
+
+
+            # Else just press like a usuall button
+            else:
+                keybd_event(letter_VK, 0, 0, 0)
+                sleep_key(0.00001)
+                keybd_event(letter_VK, 0, KEYEVENTF_KEYUP, 0)
+
+        # Successfully send the message by pressing enter
+        keybd_event(key_bindings['ENTER'], 0, 0, 0)
+        sleep_key(0.0001)
+        keybd_event(key_bindings['ENTER'], 0, KEYEVENTF_KEYUP, 0)
+
+        return
 
 
 def main():
