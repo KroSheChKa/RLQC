@@ -1,7 +1,7 @@
 # RLQC
 ## Make your qiuck chat uniqie!
 ❌~~What a save!~~\
-❌~~What a save!~~\
+❌~~Nice shot!~~\
 ✔️Here's the code for practicing saves: 2E68-0A19-F54F-D41F\
 ✔️Nice shot! If you were aiming for the bleachers!
 
@@ -19,49 +19,32 @@ git clone https://github.com/KroSheChKa/RLQC.git
 > **Make sure you have downloaded [git](https://git-scm.com/downloads)!**
 
 Customize
----
+----
 If you have modified default values in the Rocket League, you should go to the root of the file `config.py` and change the corresponding values.
 
-Key values you can find in [this table](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
-```python
-key_bindings = {
-        'RLAC_START': 0x70,
-        'RLAC_END': 0x71,
-        'TEXT_CHAT_ALL': 0x54,
-        'TEXT_CHAT_PARTY': 0x59,
-        'INFORMATION(TEAM)': 0x31,
-        'COMPLIMENTS': 0x32,
-        'REACTIONS': 0x33,
-        'APOLOGIES': 0x34,
-        'SHIFT': 0x10,
-        'ENTER': 0x0D
-        }
-```
+#### YOU NEED TO EITHER REASSIGN THE KEYS IN THE FILE `config.py`, OR CHANGE THE DEFAULTS IN ROCKET LEAGUE
+> Key values you can find in [this table](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
 
----
+**NOTE:** The default navigation values are set to keys 1 2 3 and 4. I reassigned the quick chat keys in Rocket League to other keys in order to completely replace it in the game with mine, so...
+You can change:
+
 
 Time during which the second quick chat key can be pressed
 ```python
 WAIT_TIME_SECOND_CLICK = 2.5
 ```
 
----
-
 The messages themselves. Use your imagination
 ```python
-quick_chat_messages = [
-        [
-            'Dear mate, let me take that kickoff!',
-            'Please mate, take that shot!',
-            "I'm here!",
-            'I will defend for you!'
-            ],
-        [
-            'Dddaaamn! That shot!',
-            ...
-            ]
-        ...
-        ]
+quick_chat_1_1 = [
+    "Dear mate, let me take that kickoff!",
+    ...
+    ]
+quick_chat_1_2 = [
+    "Ooh, I have no hands to take that :(",
+    ...
+    ]
+...
 ```
 
 Launching
@@ -69,19 +52,20 @@ Launching
 
 - Double click on the `RLQuickChat.py` file
 - Open Rocket League
-- Press the launch button (F1 by default)
-You are free to build friendly relationships with your mates and opponents ;)
+- Press the launch button (F1 by default)(F2 to exit the script)
+  
+*You are free to build friendly relationships with your mates and opponents ;)*
 
 ## Need to add/fix
-- [ ] **Add** randomized training codes in certain message
 - [ ] **Add** gamepad support
+- [x] **Add** randomized training codes in certain message
 - [x] **Add** random messages. + new ones
 - [x] **Add** variety of messages
-- [ ] **Fix:** A message in chat leads to forgetting the keys pressed at that moment, which interferes with gameplay
-- [x] **Fix:** Last click falsely remembering the last click results in an incorrect follow-up message
+- [ ] **Fix:** sending a message in chat leads to forgetting the keys pressed at that moment, which interferes with gameplay
 - [ ] **Fix** the issue when two messages combine in one
 - [ ] **Fix** rarely missing symbols
-
+- [ ] **Fix** freezes when enulating fast typing
+- [x] **Fix:** last click falsely remembering the last click results in an incorrect follow-up message
 ---
   
 *Any suggestions? You found a flaw?*
