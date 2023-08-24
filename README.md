@@ -26,12 +26,12 @@ If you have modified default values in the Rocket League, you should go to the r
 > Key values you can find in [this table](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
 
 **NOTE:** The default navigation values are set to keys 1 2 3 and 4. I reassigned the quick chat keys in Rocket League to other keys in order to completely replace it in the game with mine, so...
-You can change:
+##### You can change:
 
 
 Time during which the second quick chat key can be pressed
 ```python
-WAIT_TIME_SECOND_CLICK = 2.5
+WAIT_TIME_SECOND_CLICK = 2.1
 ```
 
 The messages themselves. Use your imagination
@@ -46,6 +46,27 @@ quick_chat_1_2 = [
     ]
 ...
 ```
+##### You need to change:
+
+Set the value due to your monitor's refresh rate
+```python
+# Monitor refresh rate (Hz)
+MONITOR_REFRESH_RATE = 144
+```
+
+Key values you can find in [this table](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
+```python
+key_bindings = {
+    'RLAC_START': 0x70,
+    'RLAC_END': 0x71,
+    'TEXT_CHAT_ALL': 0x54,
+    'TEXT_CHAT_PARTY': 0x59,
+    'INFORMATION(TEAM)': 0x31,
+    'COMPLIMENTS': 0x32,
+    'REACTIONS': 0x33,
+    'APOLOGIES': 0x34,
+    ...
+```
 
 Launching
 ---
@@ -58,6 +79,8 @@ Launching
 
 ## Need to add/fix
 - [ ] **Add** gamepad support
+- [ ] **Add** language fuse
+- [x] **Add** CapsLock fuse
 - [x] **Add** randomized training codes in certain message
 - [x] **Add** random messages. + new ones
 - [x] **Add** variety of messages
