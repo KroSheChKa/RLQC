@@ -233,4 +233,10 @@ else:
 
     # During this time you have to press playback,
     #   otherwise the first press will be reset
-    WAIT_TIME_SECOND_CLICK = 2.5
+    WAIT_TIME_SECOND_CLICK = 2.1
+
+    # Variables for CapsLock fuse
+    capslock_light = capslock_flag = True
+
+    # Monitor refresh rate (Hz)
+    MONITOR_REFRESH_RATE = 144

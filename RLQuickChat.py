@@ -1,9 +1,10 @@
 import sys
 import ctypes
-from win32api import keybd_event, VkKeyScan
+from win32api import keybd_event, VkKeyScan, GetKeyState
 import time
 from config import *
 from random import choice
+
 
 # Check whether the key is pressed
 def is_key_pressed(key):
@@ -11,15 +12,21 @@ def is_key_pressed(key):
     #return ctypes.windll.user32.GetAsyncKeyState(key) & 0x8000 != 0
 
 
+# Safely exit the script by releasing keys and returning CapsLock to def.val.
 def safe_exit():
+    if capslock_flag != capslock_light:
+        keybd_event(0x14, 0, 0, 0)
+        sleep_key(1 / MONITOR_REFRESH_RATE)
+        keybd_event(0x14, 0, KEYEVENTF_KEYUP, 0)
+    #capslock_fuse(capslock_flag, return_to_default = True)
     for _, key_code in key_bindings.items():
         keybd_event(key_code, 0, KEYEVENTF_KEYUP, 0)
-        sleep_key(0.00001)
+        sleep_key(1 / MONITOR_REFRESH_RATE)
     sys.exit()
 
 
 # Sleep func. that you could stop by pressing the stop key
-def sleep_key(sec):
+def sleep_key(sec = 0.0001):
     start_time = time.time()
     
     while True:
@@ -35,11 +42,16 @@ def sleep_key(sec):
             return
 
 
+# The function that remembers latest pressed keys
 def save_latest_keys():
+    # Here we store them
     list_of_pressed_keys = []
+
+    # Iterate to find pressed keys
     for key_name, key_code in active_RL_keyboard_keys.items():
         if is_key_pressed(key_code):
             list_of_pressed_keys.append(key_name)
+
     return list_of_pressed_keys
 
 
@@ -72,7 +84,8 @@ def second_click(first_click):
         # Type corresponding message if pressed button
         if any(any_key_pressed):
             key_pressed = any_key_pressed.index(True)
-            keybd_event(key_bindings['INFORMATION(TEAM)'] + key_pressed, 0, KEYEVENTF_KEYUP, 0)
+            keybd_event(key_bindings['INFORMATION(TEAM)'] + key_pressed,
+                        0, KEYEVENTF_KEYUP, 0)
 
             # Save the latest pressed buttons before the typing in chat
             list_of_pressed_keys = save_latest_keys()
@@ -89,14 +102,27 @@ def second_click(first_click):
             # Type the message in chat
             paste_in_chat(text_message, first_click)
 
+            text_message = ''
+
             # Press again the keys
             for key_name in list_of_pressed_keys:
                 keybd_event(active_RL_keyboard_keys[key_name], 0, 0, 0)
+            
             return
 
 
 # Quickly typing message in chat
 def paste_in_chat(txt_msg, chat):
+    capslock_state = GetKeyState(0x14) & 0x0001
+    if capslock_state:
+        keybd_event(0x14, 0, 0, 0)
+        sleep_key(1 / MONITOR_REFRESH_RATE)
+        keybd_event(0x14, 0, KEYEVENTF_KEYUP, 0)
+        global capslock_light
+        global capslock_flag
+        capslock_flag = not(capslock_flag)
+        capslock_light = not(capslock_light)
+
     while not(is_key_pressed(key_bindings['RLAC_END'])):
         
         # Determine in what chat we need to type
@@ -106,11 +132,11 @@ def paste_in_chat(txt_msg, chat):
             chat_type = key_bindings['TEXT_CHAT_PARTY']
         
         # Open the chat
-        sleep_key(0.001)
+        sleep_key(0.0001)
         keybd_event(chat_type, 0, 0, 0)
-        sleep_key(0.00001)
+        sleep_key()
         keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
-        sleep_key(0.012)
+        sleep_key(0.013)
         
 
         # Iterate each lette in text message
@@ -124,13 +150,13 @@ def paste_in_chat(txt_msg, chat):
 
                 # Press and hold shift
                 keybd_event(key_bindings['SHIFT'], 0, 0, 0)
-                sleep_key(0.00001)
+                sleep_key()
 
                 # Click button that needed shift
                 keybd_event(letter_VK, 0, 0, 0)
-                sleep_key(0.00001)
+                sleep_key()
                 keybd_event(letter_VK, 0, KEYEVENTF_KEYUP, 0)
-                sleep_key(0.00001)
+                sleep_key()
 
                 # Release shift
                 keybd_event(key_bindings['SHIFT'], 0, KEYEVENTF_KEYUP, 0)
@@ -139,22 +165,28 @@ def paste_in_chat(txt_msg, chat):
             # Else just press like a usuall button
             else:
                 keybd_event(letter_VK, 0, 0, 0)
-                sleep_key(0.00001)
+                sleep_key()
                 keybd_event(letter_VK, 0, KEYEVENTF_KEYUP, 0)
 
         # Successfully send the message by pressing enter
         keybd_event(key_bindings['ENTER'], 0, 0, 0)
-        sleep_key(0.0001)
+        sleep_key()
         keybd_event(key_bindings['ENTER'], 0, KEYEVENTF_KEYUP, 0)
 
         return
 
 
 def main():
-    # Press P to start the code
+    # Press F1 to start the code
     while not(is_key_pressed(key_bindings['RLAC_START'])):
         pass
     keybd_event(key_bindings['RLAC_START'], 0, KEYEVENTF_KEYUP, 0)
+
+    capslock_state = GetKeyState(0x14) & 0x0001
+
+    if capslock_state:
+        global capslock_flag
+        capslock_flag = not(capslock_flag)
 
     # Waiting for pressing the quick chat button
     while True:
@@ -177,7 +209,6 @@ def main():
             safe_exit()
 
         sleep_key(0.01)
-
 
 if __name__ =='__main__':
     
