@@ -88,7 +88,7 @@ Launching
 - [ ] **Fix** the issue when two messages combine in one
 - [ ] **Fix** rarely missing symbols
 - [ ] **Fix** freezes when enulating fast typing
-- [x] **Fix:** last click falsely remembering the last click results in an incorrect follow-up message
+- [x] **Fix:** falsely remembering the last click results in an incorrect follow-up message
 ---
   
 *Any suggestions? You found a flaw?*
