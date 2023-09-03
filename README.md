@@ -18,6 +18,11 @@ git clone https://github.com/KroSheChKa/RLQC.git
 ```
 > **Make sure you have downloaded [git](https://git-scm.com/downloads)!**
 
+Open cmd as admin and paste this:
+```
+pip install pywin32
+```
+
 Customize
 ----
 If you have modified default values in the Rocket League, you should go to the root of the file `config.py` and change the corresponding values.
