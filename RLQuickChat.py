@@ -26,7 +26,7 @@ def safe_exit():
 
 
 # Sleep func. that you could stop by pressing the stop key
-def sleep_key(sec = 0.0001):
+def sleep_key(sec = 0.00001):
     start_time = time.time()
     
     while True:
@@ -113,15 +113,19 @@ def second_click(first_click):
 
 # Quickly typing message in chat
 def paste_in_chat(txt_msg, chat):
+
     capslock_state = GetKeyState(0x14) & 0x0001
+
     if capslock_state:
         keybd_event(0x14, 0, 0, 0)
         sleep_key(1 / MONITOR_REFRESH_RATE)
         keybd_event(0x14, 0, KEYEVENTF_KEYUP, 0)
+
         global capslock_light
         global capslock_flag
-        capslock_flag = not(capslock_flag)
+
         capslock_light = not(capslock_light)
+        capslock_flag = not(capslock_flag)
 
     while not(is_key_pressed(key_bindings['RLAC_END'])):
         
@@ -132,20 +136,21 @@ def paste_in_chat(txt_msg, chat):
             chat_type = key_bindings['TEXT_CHAT_PARTY']
         
         # Open the chat
-        sleep_key(0.0001)
+        sleep_key()
         keybd_event(chat_type, 0, 0, 0)
         sleep_key()
         keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
         sleep_key(0.013)
         
 
-        # Iterate each lette in text message
+        # Iterate each letter in text message
         for letter in txt_msg:
 
-            # Get the code of
+            # Get the code of a key
             letter_VK = VkKeyScan(letter)
+            sleep_key()
 
-            # Check if the key needs to be written with the shift key
+            # Check if the key needs to be written with the shift pressed
             if letter in shift_symbols or letter.isupper():
 
                 # Press and hold shift
@@ -208,7 +213,7 @@ def main():
         if is_key_pressed(key_bindings['RLAC_END']):
             safe_exit()
 
-        sleep_key(0.01)
+        sleep_key(0.001)
 
 if __name__ =='__main__':
     
