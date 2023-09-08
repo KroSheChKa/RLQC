@@ -1,4 +1,4 @@
-# RLQC
+# RLQC (beta)
 ## Make your qiuck chat uniqie!
 ❌~~What a save!~~\
 ❌~~Nice shot!~~\
@@ -89,6 +89,7 @@ Launching
 - [x] **Add** randomized training codes in certain message
 - [x] **Add** random messages. + new ones
 - [x] **Add** variety of messages
+- [ ] **Fix:** spontaneous non-pressing of letters in the message (numbers and symbols are printed)
 - [ ] **Fix:** sending a message in chat leads to forgetting the keys pressed at that moment, which interferes with gameplay
 - [ ] **Fix** the issue when two messages combine in one
 - [ ] **Fix** rarely missing symbols
@@ -96,6 +97,6 @@ Launching
 - [x] **Fix:** falsely remembering the last click results in an incorrect follow-up message
 ---
   
-*Any suggestions? You found a flaw?*
+*Any suggestions? You found a bug?*
 
 -> Welcome to [Discussions](https://github.com/KroSheChKa/RLQC/discussions)
