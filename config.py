@@ -208,6 +208,14 @@ else:
         'ENTER': 0x0D
         }
 
+    # Buttons to iterate and search for the pressed button
+    quick_buttons_iterate = [
+        key_bindings['INFORMATION(TEAM)'],
+        key_bindings['COMPLIMENTS'],
+        key_bindings['REACTIONS'],
+        key_bindings['APOLOGIES']
+                  ]
+
     # Symbols that need to be printed with shift pressed
     shift_symbols = {
         '!','@','#','$','%','^','&','*','(',')',

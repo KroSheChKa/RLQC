@@ -61,14 +61,37 @@ def second_click(first_click):
     start_time = time.time()
 
     while True:
-        # Array is more compact than if statements
-        any_key_pressed = [
-            is_key_pressed(key_bindings['INFORMATION(TEAM)']),
-            is_key_pressed(key_bindings['COMPLIMENTS']),
-            is_key_pressed(key_bindings['REACTIONS']),
-            is_key_pressed(key_bindings['APOLOGIES'])
-        ]
-        
+        # Iterate to detect next button
+        for key in quick_buttons_iterate:
+            if is_key_pressed(key):
+                # Instantly release the key (avoid false detection)
+                keybd_event(key, 0, KEYEVENTF_KEYUP, 0)
+                
+                second_key = quick_buttons_iterate.index(key)
+
+                # Save the latest pressed buttons before the typing in chat
+                list_of_pressed_keys = save_latest_keys()
+
+                # Text that should be typed in chat
+                text_message = choice(quick_chat_messages[first_click][second_key])
+
+                # Check whether we need to add map codes
+                if text_message == quick_chat_2_1[0]:
+                    text_message = text_message + choice(shooting_trainig_map_codes)
+                elif text_message == quick_chat_2_4[0]:
+                    text_message = text_message + choice(defence_trainig_map_codes)
+                
+                # Type the message in chat
+                paste_in_chat(text_message, first_click)
+
+                text_message = ''
+
+                # Press again the keys
+                for key_name in list_of_pressed_keys:
+                    keybd_event(active_RL_keyboard_keys[key_name], 0, 0, 0)
+                
+                return
+
         # ExitKey pressed during the loop? - exit the entire program
         if is_key_pressed(key_bindings['RLAC_END']):
             safe_exit()
@@ -82,33 +105,8 @@ def second_click(first_click):
             return
         
         # Type corresponding message if pressed button
-        if any(any_key_pressed):
-            key_pressed = any_key_pressed.index(True)
-            keybd_event(key_bindings['INFORMATION(TEAM)'] + key_pressed,
-                        0, KEYEVENTF_KEYUP, 0)
+        
 
-            # Save the latest pressed buttons before the typing in chat
-            list_of_pressed_keys = save_latest_keys()
-
-            # Text that should be typed in chat
-            text_message = choice(quick_chat_messages[first_click][key_pressed])
-
-            # Check whether we need to add map codes
-            if text_message == quick_chat_2_1[0]:
-                text_message = text_message + choice(shooting_trainig_map_codes)
-            elif text_message == quick_chat_2_4[0]:
-                text_message = text_message + choice(defence_trainig_map_codes)
-            
-            # Type the message in chat
-            paste_in_chat(text_message, first_click)
-
-            text_message = ''
-
-            # Press again the keys
-            for key_name in list_of_pressed_keys:
-                keybd_event(active_RL_keyboard_keys[key_name], 0, 0, 0)
-            
-            return
 
 
 # Quickly typing message in chat
@@ -195,20 +193,13 @@ def main():
 
     # Waiting for pressing the quick chat button
     while True:
-        any_key_pressed = [
-            is_key_pressed(key_bindings['INFORMATION(TEAM)']),
-            is_key_pressed(key_bindings['COMPLIMENTS']),
-            is_key_pressed(key_bindings['REACTIONS']),
-            is_key_pressed(key_bindings['APOLOGIES'])
-        ]
-
-        # Catch pressing the quick chat button
-        if any(any_key_pressed):
-            key_pressed = any_key_pressed.index(True)
-            keybd_event(key_bindings['INFORMATION(TEAM)'] + key_pressed,
-                        0, KEYEVENTF_KEYUP, 0)
-            second_click(key_pressed)
-
+        for key in quick_buttons_iterate:
+            if is_key_pressed(key):
+                # Instantly release the key (avoid false detection)
+                keybd_event(key, 0, KEYEVENTF_KEYUP, 0)
+                second_click(quick_buttons_iterate.index(key))
+                break
+    
         # Check wether the exit button pressed
         if is_key_pressed(key_bindings['RLAC_END']):
             safe_exit()
