@@ -5,6 +5,9 @@
 ✔️Here's the code for practicing saves: 2E68-0A19-F54F-D41F\
 ✔️Nice shot! If you were aiming for the bleachers!
 
+
+#### Warning: modify text messages at your own risk! You may be banned for obscene language. 
+
 ## How to install, customize and launch
 
 
@@ -89,11 +92,12 @@ Launching
 - [x] **Add** randomized training codes in certain message
 - [x] **Add** random messages. + new ones
 - [x] **Add** variety of messages
-- [ ] **Fix:** spontaneous non-pressing of letters in the message (numbers and symbols are printed)
+---
+- [ ] **Fix:** spontaneous non-pressing of letters in the message (numbers and symbols are printed) (fixes by changing the language during the game)
 - [ ] **Fix:** sending a message in chat leads to forgetting the keys pressed at that moment, which interferes with gameplay
-- [ ] **Fix** the issue when two messages combine in one
-- [ ] **Fix** rarely missing symbols
-- [ ] **Fix** freezes when enulating fast typing
+- [ ] **Fix** freezes when emulating fast typing
+- [x] **Fix** rarely missing symbols
+- [x] **Fix** the issue when two messages combine in one
 - [x] **Fix:** falsely remembering the last click results in an incorrect follow-up message
 ---
   
