@@ -8,8 +8,8 @@ from random import choice
 
 # Check whether the key is pressed
 def is_key_pressed(key):
-    return ctypes.windll.user32.GetKeyState(key) & 0x8000 != 0
-    #return ctypes.windll.user32.GetAsyncKeyState(key) & 0x8000 != 0
+    #return ctypes.windll.user32.GetKeyState(key) & 0x8000 != 0
+    return ctypes.windll.user32.GetAsyncKeyState(key) & 0x8000 != 0
 
 
 # Safely exit the script by releasing keys and returning CapsLock to def.val.
@@ -64,13 +64,14 @@ def second_click(first_click):
         # Iterate to detect next button
         for key in quick_buttons_iterate:
             if is_key_pressed(key):
+
                 # Instantly release the key (avoid false detection)
                 keybd_event(key, 0, KEYEVENTF_KEYUP, 0)
                 
                 second_key = quick_buttons_iterate.index(key)
 
                 # Save the latest pressed buttons before the typing in chat
-                list_of_pressed_keys = save_latest_keys()
+                #list_of_pressed_keys = save_latest_keys()
 
                 # Text that should be typed in chat
                 text_message = choice(quick_chat_messages[first_click][second_key])
@@ -84,11 +85,9 @@ def second_click(first_click):
                 # Type the message in chat
                 paste_in_chat(text_message, first_click)
 
-                text_message = ''
-
                 # Press again the keys
-                for key_name in list_of_pressed_keys:
-                    keybd_event(active_RL_keyboard_keys[key_name], 0, 0, 0)
+                # for key_name in list_of_pressed_keys:
+                #     keybd_event(active_RL_keyboard_keys[key_name], 0, 0, 0)
                 
                 return
 
@@ -103,10 +102,6 @@ def second_click(first_click):
         # If the time has run out, exit the loop
         if elapsed_time >= WAIT_TIME_SECOND_CLICK:
             return
-        
-        # Type corresponding message if pressed button
-        
-
 
 
 # Quickly typing message in chat
@@ -140,8 +135,7 @@ def paste_in_chat(txt_msg, chat):
         keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
         sleep_key(0.013)
         
-
-        # Iterate each letter in text message
+        # Iterate over each letter in text message
         for letter in txt_msg:
 
             # Get the code of a key
@@ -176,6 +170,7 @@ def paste_in_chat(txt_msg, chat):
         sleep_key()
         keybd_event(key_bindings['ENTER'], 0, KEYEVENTF_KEYUP, 0)
 
+        sleep_key(0.05)
         return
 
 
@@ -195,6 +190,7 @@ def main():
     while True:
         for key in quick_buttons_iterate:
             if is_key_pressed(key):
+
                 # Instantly release the key (avoid false detection)
                 keybd_event(key, 0, KEYEVENTF_KEYUP, 0)
                 second_click(quick_buttons_iterate.index(key))
