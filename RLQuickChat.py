@@ -12,16 +12,19 @@ def is_key_pressed(key):
     return ctypes.windll.user32.GetAsyncKeyState(key) & 0x8000 != 0
 
 
-# Safely exit the script by releasing keys and returning CapsLock to def.val.
+# Safely exit the script
 def safe_exit():
+    # Returning CapsLock to default value
     if capslock_flag != capslock_light:
         keybd_event(0x14, 0, 0, 0)
         sleep_key(1 / MONITOR_REFRESH_RATE)
         keybd_event(0x14, 0, KEYEVENTF_KEYUP, 0)
-    #capslock_fuse(capslock_flag, return_to_default = True)
+
+    # Releasing keys that might be pressed
     for _, key_code in key_bindings.items():
         keybd_event(key_code, 0, KEYEVENTF_KEYUP, 0)
         sleep_key(1 / MONITOR_REFRESH_RATE)
+
     sys.exit()
 
 
@@ -42,17 +45,17 @@ def sleep_key(sec = 0.00001):
             return
 
 
-# The function that remembers latest pressed keys
-def save_latest_keys():
-    # Here we store them
-    list_of_pressed_keys = []
+# # The function that remembers latest pressed keys (not working properly!)
+# def save_latest_keys():
+#     # We store keys
+#     list_of_pressed_keys = []
 
-    # Iterate to find pressed keys
-    for key_name, key_code in active_RL_keyboard_keys.items():
-        if is_key_pressed(key_code):
-            list_of_pressed_keys.append(key_name)
+#     # Iterate over the dict. to find pressed keys
+#     for key_name, key_code in active_RL_keyboard_keys.items():
+#         if is_key_pressed(key_code):
+#             list_of_pressed_keys.append(key_name)
 
-    return list_of_pressed_keys
+#     return list_of_pressed_keys
 
 
 # Expecting a second click after the first
@@ -61,7 +64,7 @@ def second_click(first_click):
     start_time = time.time()
 
     while True:
-        # Iterate to detect next button
+        # Iterate to detect next keystroke
         for key in quick_buttons_iterate:
             if is_key_pressed(key):
 
@@ -70,7 +73,7 @@ def second_click(first_click):
                 
                 second_key = quick_buttons_iterate.index(key)
 
-                # Save the latest pressed buttons before the typing in chat
+                # Save the latest pressed buttons before the typing in chat (!)
                 #list_of_pressed_keys = save_latest_keys()
 
                 # Text that should be typed in chat
@@ -104,11 +107,13 @@ def second_click(first_click):
             return
 
 
-# Quickly typing message in chat
+# Quickly type message in chat
 def paste_in_chat(txt_msg, chat):
 
+    # Get info about CapsLock key state to prevent UPPERCASE typing
     capslock_state = GetKeyState(0x14) & 0x0001
 
+    # If yes, we turn off the capslock
     if capslock_state:
         keybd_event(0x14, 0, 0, 0)
         sleep_key(1 / MONITOR_REFRESH_RATE)
@@ -117,6 +122,7 @@ def paste_in_chat(txt_msg, chat):
         global capslock_light
         global capslock_flag
 
+        # Change the CapsLock flags
         capslock_light = not(capslock_light)
         capslock_flag = not(capslock_flag)
 
@@ -180,8 +186,10 @@ def main():
         pass
     keybd_event(key_bindings['RLAC_START'], 0, KEYEVENTF_KEYUP, 0)
 
+    # Get info about CapsLock key state
     capslock_state = GetKeyState(0x14) & 0x0001
 
+    # Change the CapsLock flag if the key's state is 1
     if capslock_state:
         global capslock_flag
         capslock_flag = not(capslock_flag)
