@@ -54,6 +54,7 @@ quick_chat_1_2 = [
     ]
 ...
 ```
+
 ##### You need to change:
 
 Set the value due to your monitor's refresh rate
