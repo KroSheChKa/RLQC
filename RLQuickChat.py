@@ -147,14 +147,15 @@ def paste_in_chat(txt_msg, chat):
         for letter in txt_msg:
             if letter.isupper() or letter in shift_symbols:
                 with keyboard.pressed(Key.shift):
+                    sleep_key(0.0005)
                     keyboard.press(letter)
-                    sleep_key()
+                    sleep_key(0.0005)
                     keyboard.release(letter)
             else:
                 keyboard.press(letter)
-                sleep_key()
+                sleep_key(0.0005)
                 keyboard.release(letter)
-            sleep_key()
+            sleep_key(0.0005)
 
 
         # # Iterate over each letter in text message
@@ -230,8 +231,8 @@ def main():
 
         sleep_key(0.001)
 
-keyboard = Controller()
-
 if __name__ =='__main__':
     
+    keyboard = Controller()
+
     main()
