@@ -30,24 +30,6 @@ def safe_exit():
     sys.exit()
 
 
-# # Sleep func. that you could stop by pressing the stop key
-# def sleep_key(sec = 0.00001):
-#     start_time = time.time()
-    
-#     while True:
-#         # # ExitKey pressed during the loop? - exit the entire program
-#         # if is_key_pressed(key_bindings['RLAC_END']):
-#         #     keybd_event(0x14, 0, key_bindings['RLAC_END'], 0)
-#         #     safe_exit()
-
-#         current_time = time.time()
-#         elapsed_time = current_time - start_time
-        
-#         # If the time has run out, exit the loop
-#         if elapsed_time >= sec:
-#             return
-
-
 # # The function that remembers latest pressed keys (not working properly!)
 # def save_latest_keys():
 #     # We store keys
@@ -113,6 +95,7 @@ def second_click(first_click):
 
 # Quickly type message in chat
 def paste_in_chat(txt_msg, chat):
+
     # Get info about CapsLock key state to prevent UPPERCASE typing
     capslock_state = GetKeyState(0x14) & 0x0001
 
@@ -143,55 +126,27 @@ def paste_in_chat(txt_msg, chat):
         sleep_key()
         keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
         sleep_key(0.014)
-        
+
+        # Iterate over each letter in text message
         for letter in txt_msg:
             letter_vk = KeyCode().from_vk(VkKeyScan_(letter))
+
+            # Check if the key needs to be written with the shift pressed
             if letter.isupper() or letter in shift_symbols:
+
+                # Press the key with shift pressed
                 with keyboard.pressed(Key.shift):
                     sleep_key(0.0005)
-
                     keyboard.press(letter_vk)
                     sleep_key(0.0005)
                     keyboard.release(letter_vk)
+
+            # Else just press like a usuall button
             else:
                 keyboard.press(letter_vk)
                 sleep_key(0.0005)
                 keyboard.release(letter_vk)
             sleep_key(0.0005)
-
-
-        # # Iterate over each letter in text message
-        # for letter in txt_msg:
-
-        #     # Get the code of a key
-        #     letter_VK = VkKeyScan(letter)
-        #     #if letter_VK == -1:
-        #         #func
-        #         #return
-        #     sleep_key()
-
-        #     # Check if the key needs to be written with the shift pressed
-        #     if letter in shift_symbols or letter.isupper():
-
-        #         # Press and hold shift
-        #         keybd_event(key_bindings['SHIFT'], 0, 0, 0)
-        #         sleep_key()
-
-        #         # Click button that needed shift
-        #         keybd_event(letter_VK, 0, 0, 0)
-        #         sleep_key()
-        #         keybd_event(letter_VK, 0, KEYEVENTF_KEYUP, 0)
-        #         sleep_key()
-
-        #         # Release shift
-        #         keybd_event(key_bindings['SHIFT'], 0, KEYEVENTF_KEYUP, 0)
-
-
-        #     # Else just press like a usuall button
-        #     else:
-        #         keybd_event(letter_VK, 0, 0, 0)
-        #         sleep_key()
-        #         keybd_event(letter_VK, 0, KEYEVENTF_KEYUP, 0)
 
         # Successfully send the message by pressing enter
         keybd_event(key_bindings['ENTER'], 0, 0, 0)
