@@ -5,6 +5,17 @@
 ✔️Here's the code for practicing saves: 2E68-0A19-F54F-D41F\
 ✔️Nice shot! If you were aiming for the bleachers!
 
+### Advantages of this program:
+- Custom comments!
+- Easy and familiar message sending, as implemented in Rocket League (4 buttons system + delay to reset the press)
+- You can add as many comments as you want to one keyboard shortcut (e.g. 1-1, 2-4 ect.).\
+    They will be selected randomly
+- A feature that prevents accidental pressing of Caps Lock and subsequent output of a message in uppercase. \
+  Also the synchronization of the value and the light indicator on Caps Lock is maintained!
+- Safe termination of the script without accidentally unreleased  keys.
+- Start and end the program by pressing a button.
+- Prevent incorrect emulation of keystrokes on the wrong layout.
+> Gamepad support upcomming!
 
 #### Warning: modify text messages at your own risk! You may be banned for obscene language. 
 
@@ -14,7 +25,7 @@
 Installation
 ---
 A few steps:
-- Make sure you have installed [python 3.X](https://www.python.org/downloads/) (Better to download 3.10 or higher)
+- Make sure you have installed [python 3.X](https://www.python.org/downloads/) (Better to download 3.10 or higher.)
 - Download it as **.zip**. As an alternative you can clone this project by command below:
 ```
 git clone https://github.com/KroSheChKa/RLQC.git
@@ -23,7 +34,7 @@ git clone https://github.com/KroSheChKa/RLQC.git
 
 Open cmd as admin and paste this:
 ```
-pip install pywin32
+pip install -r requirements.txt
 ```
 
 Customize
@@ -57,12 +68,6 @@ quick_chat_1_2 = [
 
 ##### You need to change:
 
-Set the value due to your monitor's refresh rate
-```python
-# Monitor refresh rate (Hz)
-MONITOR_REFRESH_RATE = 144
-```
-
 Key values you can find in [this table](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
 ```python
 key_bindings = {
@@ -94,9 +99,9 @@ Launching
 - [x] **Add** random messages. + new ones
 - [x] **Add** variety of messages
 ---
-- [ ] **Fix:** spontaneous non-pressing of letters in the message (numbers and symbols are printed) (fixes by changing the language during the game)
 - [ ] **Fix:** sending a message in chat leads to forgetting the keys pressed at that moment, which interferes with gameplay
 - [ ] **Fix** freezes when emulating fast typing
+- [x] **Fix:** spontaneous non-pressing of letters in the message (numbers and symbols are printed)
 - [x] **Fix** rarely missing symbols
 - [x] **Fix** the issue when two messages combine in one
 - [x] **Fix:** falsely remembering the last click results in an incorrect follow-up message
