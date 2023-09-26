@@ -1,11 +1,11 @@
 import sys
 import ctypes
-from win32api import keybd_event, VkKeyScan, GetKeyState
-from pynput.keyboard import Controller, Key
+from win32api import keybd_event, GetKeyState
+from pynput.keyboard import Controller, Key, KeyCode
 import time
 from config import *
 from random import choice
-
+from lang_determ import *
 
 # Check whether the key is pressed
 def is_key_pressed(key):
@@ -30,22 +30,22 @@ def safe_exit():
     sys.exit()
 
 
-# Sleep func. that you could stop by pressing the stop key
-def sleep_key(sec = 0.00001):
-    start_time = time.time()
+# # Sleep func. that you could stop by pressing the stop key
+# def sleep_key(sec = 0.00001):
+#     start_time = time.time()
     
-    while True:
-        # # ExitKey pressed during the loop? - exit the entire program
-        # if is_key_pressed(key_bindings['RLAC_END']):
-        #     keybd_event(0x14, 0, key_bindings['RLAC_END'], 0)
-        #     safe_exit()
+#     while True:
+#         # # ExitKey pressed during the loop? - exit the entire program
+#         # if is_key_pressed(key_bindings['RLAC_END']):
+#         #     keybd_event(0x14, 0, key_bindings['RLAC_END'], 0)
+#         #     safe_exit()
 
-        current_time = time.time()
-        elapsed_time = current_time - start_time
+#         current_time = time.time()
+#         elapsed_time = current_time - start_time
         
-        # If the time has run out, exit the loop
-        if elapsed_time >= sec:
-            return
+#         # If the time has run out, exit the loop
+#         if elapsed_time >= sec:
+#             return
 
 
 # # The function that remembers latest pressed keys (not working properly!)
@@ -145,16 +145,18 @@ def paste_in_chat(txt_msg, chat):
         sleep_key(0.014)
         
         for letter in txt_msg:
+            letter_vk = KeyCode().from_vk(VkKeyScan_(letter))
             if letter.isupper() or letter in shift_symbols:
                 with keyboard.pressed(Key.shift):
                     sleep_key(0.0005)
-                    keyboard.press(letter)
+
+                    keyboard.press(letter_vk)
                     sleep_key(0.0005)
-                    keyboard.release(letter)
+                    keyboard.release(letter_vk)
             else:
-                keyboard.press(letter)
+                keyboard.press(letter_vk)
                 sleep_key(0.0005)
-                keyboard.release(letter)
+                keyboard.release(letter_vk)
             sleep_key(0.0005)
 
 
@@ -201,6 +203,9 @@ def paste_in_chat(txt_msg, chat):
 
 
 def main():
+    # Change the language to the proper one
+    language_we_happy()
+
     # Press F1 to start the code
     while not(is_key_pressed(key_bindings['RLAC_START'])):
         pass
