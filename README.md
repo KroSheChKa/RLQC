@@ -5,6 +5,9 @@
 ✔️Here's the code for practicing saves: 2E68-0A19-F54F-D41F\
 ✔️Nice shot! If you were aiming for the bleachers!
 
+![image](https://github.com/user-attachments/assets/76cdd253-cb88-4a70-8841-8b1074a8791e)
+> Guess where is the real **chat menu**
+
 ### Advantages of this program:
 - Custom comments!
 - Easy and familiar message sending, as implemented in Rocket League (4 buttons system + delay to reset the press)
@@ -15,7 +18,7 @@
 - Safe termination of the script without accidentally unreleased  keys.
 - Start and end the program by pressing a button.
 - Prevent incorrect emulation of keystrokes on the wrong layout.
-> Gamepad support upcomming!
+> Gamepad support upcoming!
 
 #### Warning: modify text messages at your own risk! You may be banned for obscene language. 
 
