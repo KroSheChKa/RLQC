@@ -12,8 +12,8 @@ from PyQt5.QtWidgets import QApplication, QWidget
 class FramelessOverlay(QWidget):
     def __init__(self, windows_params):
         super().__init__()
-
-        flags = Qt.FramelessWindowHint | Qt.WindowTransparentForInput
+        # Qt.Tool - no selectable window
+        flags = Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.Tool
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_TranslucentBackground)
