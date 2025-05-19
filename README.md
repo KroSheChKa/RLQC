@@ -92,6 +92,7 @@ Launching
 *You are free to build friendly relationships with your mates and opponents ;)*
 
 ## Need to add/fix
+- [ ] **Add** UI for quick chat (UPCOMING!!!!)
 - [ ] **Add** gamepad support
 - [ ] **Add** language fuse
 - [x] **Add** CapsLock fuse
