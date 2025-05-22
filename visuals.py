@@ -8,12 +8,13 @@ from PyQt5.QtGui import (
     QLinearGradient, QPainterPath, QPen
 )
 from PyQt5.QtWidgets import QApplication, QWidget
+import math
 
 class FramelessOverlay(QWidget):
     def __init__(self, windows_params):
         super().__init__()
         # Qt.Tool - no selectable window
-        flags = Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.Tool
+        flags = Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.Tool | Qt.WindowStaysOnTopHint
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -90,20 +91,45 @@ class FramelessOverlay(QWidget):
         ]
 
         for text, color, (x, y), size, spacing in headers:
-
             font = QFont(self.header_family, size)
-
             font.setLetterSpacing(QFont.AbsoluteSpacing, spacing)
-
             painter.setFont(font)
+
             path = QPainterPath()
             path.addText(x, y, font, text)
+
+            pen_outline = QPen(QColor(color))
+            pen_outline.setWidthF(1.3)
+            pen_outline.setJoinStyle(Qt.RoundJoin)
+            painter.strokePath(path, pen_outline)
+
+            if text == 'COMPLIMENTS':
+
+                pen_outline = QPen(QColor(color))
+                pen_outline.setWidthF(1.3)
+                pen_outline.setJoinStyle(Qt.RoundJoin)
+                painter.strokePath(path, pen_outline)
+
+                layers = 8
+                max_glow_w = 14
+                base_alpha = 32
+
+                for i in range(layers):
+                    frac = i / (layers - 1)
+                    w    = 1.3 + (max_glow_w - 1.3) * frac
+                    a    = int(base_alpha * (1 - frac))
+                    if a <= 0:
+                        continue
+
+                    glow = QColor(blue)
+                    glow.setAlpha(a)
+                    pen = QPen(glow)
+                    pen.setWidthF(w)
+                    pen.setJoinStyle(Qt.RoundJoin)
+                    painter.strokePath(path, pen)
+                
             painter.fillPath(path, QColor(color))
 
-            pen = QPen(QColor(color))
-            pen.setWidthF(1.3)
-            pen.setJoinStyle(Qt.RoundJoin)
-            painter.strokePath(path, pen)
 
         nums = {'left': 46, 'top': 108, 'font-size': 16, 'font-weight': 50, 'line-offset': 40}
 
