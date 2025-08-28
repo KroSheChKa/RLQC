@@ -241,7 +241,7 @@ else:
 
     # During this time you have to press playback,
     #   otherwise the first press will be reset
-    WAIT_TIME_SECOND_CLICK = 2.1
+    WAIT_TIME_SECOND_CLICK = 1.9
 
     # Variables for CapsLock fuse
     capslock_light = capslock_flag = True

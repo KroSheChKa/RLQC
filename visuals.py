@@ -2,7 +2,7 @@ import sys
 import os
 import win32gui
 import win32con
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import (
     QPainter, QColor, QFontDatabase, QFont,
     QLinearGradient, QPainterPath, QPen
@@ -25,6 +25,14 @@ class FramelessOverlay(QWidget):
             windows_params['height']
         )
 
+        # dynamic content
+        self.category_text = 'COMPLIMENTS'
+        self.msgs = ["Nice one!", "Great pass!", "Thanks!", "What a save!"]
+        self.fade_anim = None
+        self.selected_index = None
+        self.selected_weight = 65
+        self.selected_color = "#FFFFFF"
+
         bour_path = os.path.join(os.path.dirname(__file__), "fonts\\menu\\Bourgeois-Light.otf")
         if os.path.exists(bour_path):
             fid = QFontDatabase.addApplicationFont(bour_path)
@@ -46,6 +54,71 @@ class FramelessOverlay(QWidget):
             else:
                 print(f"Warning: Arial Narrow not found in system or {arial_path}, using Sans Serif")
                 self.number_family = "Sans Serif"
+
+    def set_content(self, category_text, msgs):
+        self.category_text = str(category_text) if category_text else ''
+        # ensure exactly 4 lines, truncate or pad
+        m = list(msgs)[:4] if msgs else []
+        while len(m) < 4:
+            m.append('')
+        self.msgs = m
+        self.update()
+
+    def clear_selection(self):
+        self.selected_index = None
+        self.update()
+
+    def set_selection(self, idx, weight=75):
+        self.selected_index = idx
+        self.selected_weight = weight
+        self.update()
+
+    def set_selected_style(self, idx, weight=75, color="#FFFFFF"):
+        self.selected_index = idx
+        self.selected_weight = weight
+        self.selected_color = color
+        self.update()
+
+    # --- animations ---
+    def _fade_to(self, target_opacity, duration_ms=200):
+        if self.fade_anim is not None:
+            try:
+                self.fade_anim.stop()
+            except Exception:
+                pass
+            self.fade_anim.deleteLater()
+            self.fade_anim = None
+
+        anim = QPropertyAnimation(self, b"windowOpacity")
+        anim.setDuration(duration_ms)
+        anim.setStartValue(self.windowOpacity())
+        anim.setEndValue(target_opacity)
+        anim.setEasingCurve(QEasingCurve.InOutQuad)
+
+        if target_opacity == 0.0:
+            def _hide():
+                self.hide()
+            anim.finished.connect(_hide)
+
+        anim.start()
+        self.fade_anim = anim
+
+    def fade_in(self, duration_ms=200):
+        self.setWindowOpacity(0.0)
+        self.show()
+        self._fade_to(1.0, duration_ms)
+
+    def fade_out(self, duration_ms=200):
+        self._fade_to(0.0, duration_ms)
+
+    def show_with_content(self, title, msgs, duration_ms=200):
+        # Prepare invisible, set content, then fade-in to avoid flicker of stale content
+        self.setWindowOpacity(0.0)
+        self.set_content(title, msgs)
+        self.clear_selection()
+        self.show()
+        self.repaint()
+        self._fade_to(1.0, duration_ms)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -87,7 +160,7 @@ class FramelessOverlay(QWidget):
 
         headers = [
             ('QUICK CHAT', blue, (35, 35), 15, 1.7),
-            ('COMPLIMENTS', '#FFFFFF', (35, 67), 19, 2)
+            (self.category_text, '#FFFFFF', (35, 67), 19, 2)
         ]
 
         for text, color, (x, y), size, spacing in headers:
@@ -103,7 +176,7 @@ class FramelessOverlay(QWidget):
             pen_outline.setJoinStyle(Qt.RoundJoin)
             painter.strokePath(path, pen_outline)
 
-            if text == 'COMPLIMENTS':
+            if text == self.category_text:
 
                 pen_outline = QPen(QColor(color))
                 pen_outline.setWidthF(1.3)
@@ -145,17 +218,26 @@ class FramelessOverlay(QWidget):
 
         chat_msgs = {'left': 82, 'top': nums['top'], 'font-size': 16, 'font-weight': 50, 'line-offset': 40}
 
-        msgs = ["Nice one!", "Great pass!", "Thanks!", "What a save!"]
-
         for i in range(4):
-            text = msgs[i]
+            text = self.msgs[i]
             x = chat_msgs['left']
-            y = chat_msgs['top'] + chat_msgs['line-offset'] * (i)
+            baseline_y = chat_msgs['top'] + chat_msgs['line-offset'] * (i)
 
-            font = QFont(self.number_family, chat_msgs['font-size'], chat_msgs['font-weight'])
+            # Draw a single line per item, eliding if necessary. Shadow/background stays unchanged
+            font = QFont(self.number_family, chat_msgs['font-size'])
+            if self.selected_index is not None and i == self.selected_index:
+                font.setWeight(int(self.selected_weight))
+            else:
+                font.setWeight(int(chat_msgs['font-weight']))
             painter.setFont(font)
-            painter.setPen(QColor(blue))
-            painter.drawText(x, y, text)
+            if self.selected_index is not None and i == self.selected_index:
+                painter.setPen(QColor(self.selected_color))
+            else:
+                painter.setPen(QColor(blue))
+            fm = painter.fontMetrics()
+            max_width = self.width() - x - 26
+            single_line = fm.elidedText(text, Qt.ElideRight, max_width)
+            painter.drawText(x, baseline_y, single_line)
 
 
 if __name__ == "__main__":
@@ -169,6 +251,7 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
     overlay = FramelessOverlay(wp)
+    overlay.set_content('COMPLIMENTS', ["Nice one!", "Great pass!", "Thanks!", "What a save!"])
     overlay.show()
 
     hwnd = int(overlay.winId())

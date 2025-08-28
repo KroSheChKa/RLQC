@@ -85,14 +85,83 @@ def determ_change_lang_keys():
             continue
         else:
             return [key_str, Key.shift]
+    # Could not detect a working hotkey combination
+    return None
+
+
+# A set of common English LCIDs (US/UK/AU/CA/NZ/etc.)
+ENGLISH_LCIDS = {
+    0x0409, 0x0809, 0x0C09, 0x1009, 0x1409, 0x1809,
+    0x1C09, 0x2009, 0x2409, 0x2809, 0x2C09, 0x3009,
+    0x3409, 0x4009
+}
+
+
+def is_english_layout_hex(layout_hex: str) -> bool:
+    try:
+        val = int(layout_hex, 16) & 0xFFFF
+        return val in ENGLISH_LCIDS
+    except Exception:
+        return False
+
+
+def press_lang_switch(first_key, second_key):
+    keyboard = Controller()
+    sleep_key(0.0001)
+    with keyboard.pressed(second_key):
+        keyboard.press(first_key)
+        sleep_key(0.0001)
+        keyboard.release(first_key)
+        sleep_key(0.0001)
+
+
+def ensure_english_layout_return_initial():
+    """Ensure current layout is English.
+
+    Returns a tuple (initial_layout_hex, keys) where keys is the detected
+    switching combo (first_key, second_key). If detection fails, returns
+    (current_layout_hex, None) and does not switch.
+    """
+    initial = get_keyboard_layout_name()
+    keys = determ_change_lang_keys()
+    if not keys:
+        return initial, None
+
+    if is_english_layout_hex(get_keyboard_layout_name()):
+        return initial, keys
+
+    for _ in range(20):
+        press_lang_switch(keys[0], keys[1])
+        if is_english_layout_hex(get_keyboard_layout_name()):
+            break
+    return initial, keys
+
+
+def force_english_layout(keys=None):
+    """Ensure English layout is active. Returns keys used (or None if failed)."""
+    if is_english_layout_hex(get_keyboard_layout_name()):
+        return keys
+
+    local_keys = keys if keys else determ_change_lang_keys()
+    if not local_keys:
+        return None
+
+    for _ in range(20):
+        press_lang_switch(local_keys[0], local_keys[1])
+        if is_english_layout_hex(get_keyboard_layout_name()):
+            return local_keys
+    return local_keys
 
 
 # Changing the language until the messages will be printable
 def language_we_happy():
+    # Try to detect a working hotkey
+    keys = determ_change_lang_keys()
+    # If not found, skip language switching to avoid crash
+    if not keys:
+        return
 
-    # Get the keyboard layout
-    first_key, second_key = determ_change_lang_keys()
-    #print(first_key, second_key)
+    first_key, second_key = keys
     
     while True:
         keyboard = Controller()
