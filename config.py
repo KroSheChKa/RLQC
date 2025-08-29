@@ -174,6 +174,43 @@ else:
                 ]
             ]
 
+    # 5th category: Custom (example content)
+    quick_chat_5_1 = [
+        "Custom one!",
+        "Hello there!",
+        "Let's go!",
+        "Stay focused!"
+    ]
+    quick_chat_5_2 = [
+        "Nice rotation.",
+        "Hold the line.",
+        "Chase it!",
+        "Cut mid."
+    ]
+    quick_chat_5_3 = [
+        "Regroup.",
+        "I need boost.",
+        "On your right!",
+        "On your left!"
+    ]
+    quick_chat_5_4 = [
+        "Passing.",
+        "Centering.",
+        "Bumping goalie.",
+        "Faking."
+    ]
+
+    # Append Custom to the list of categories
+    quick_chat_messages.append([
+        quick_chat_5_1,
+        quick_chat_5_2,
+        quick_chat_5_3,
+        quick_chat_5_4
+    ])
+
+    # Category titles (should match the number of quick_chat_messages categories)
+    category_titles = ['INFORMATIONAL', 'COMPLIMENTS', 'REACTIONS', 'APOLOGIES', 'CUSTOM']
+
     # List of map codes that you would recommend practicing to your team/opponents
     shooting_trainig_map_codes = [
         "EC70-54C0-9928-E6BC",
@@ -204,16 +241,19 @@ else:
         'COMPLIMENTS': 0x32,
         'REACTIONS': 0x33,
         'APOLOGIES': 0x34,
+        'CUSTOM': 0x35,
         'SHIFT': 0x10,
         'ENTER': 0x0D
         }
 
     # Buttons to iterate and search for the pressed button
+    # Category keys (first click)
     quick_buttons_iterate = [
         key_bindings['INFORMATION(TEAM)'],
         key_bindings['COMPLIMENTS'],
         key_bindings['REACTIONS'],
-        key_bindings['APOLOGIES']
+        key_bindings['APOLOGIES'],
+        key_bindings['CUSTOM']
                   ]
 
     # Symbols that need to be printed with shift pressed

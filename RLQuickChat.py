@@ -55,7 +55,7 @@ def overlay_init():
     INTERFACE_SCALE = 100
     default = {'left':16,'top':470,'width':395,'height':260}
     left = int(default['left'] * INTERFACE_SCALE/100)
-    top = int(0.4*default['top'] * INTERFACE_SCALE/100)
+    top = int(default['top'] * INTERFACE_SCALE/100)
     width = int(default['width'] * INTERFACE_SCALE/100)
     height = int(default['height'] * INTERFACE_SCALE/100)
     wp = {'left':left,'top':top,'width':width,'height':height}
@@ -78,7 +78,7 @@ def overlay_pump_events():
 def overlay_show_for_category(category_idx, msgs=None):
     if overlay_app is None or overlay_win is None:
         return
-    titles = ['INFORMATIONAL', 'COMPLIMENTS', 'REACTIONS', 'APOLOGIES']
+    titles = category_titles if 'category_titles' in globals() else ['INFORMATIONAL', 'COMPLIMENTS', 'REACTIONS', 'APOLOGIES', 'CUSTOM']
     title = titles[category_idx] if 0 <= category_idx < len(titles) else 'QUICK CHAT'
     # if msgs provided, use them; else preview first phrase of each sub-list
     if msgs is None:
@@ -203,11 +203,11 @@ def paste_in_chat(txt_msg, chat):
             chat_type = key_bindings['TEXT_CHAT_PARTY']
         
         # Open the chat — slightly increased delays to avoid truncation on rapid key sequences
-        sleep_key(0.02)
+        # sleep_key(0.023)
         keybd_event(chat_type, 0, 0, 0)
-        sleep_key(0.005)
+        sleep_key(0.001)
         keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
-        sleep_key(0.01)
+        sleep_key(0.02)
 
         # Ensure English layout AFTER chat field receives focus (game may reset layout)
         try:
@@ -233,17 +233,16 @@ def paste_in_chat(txt_msg, chat):
 
                 # Press the key with shift pressed
                 with keyboard.pressed(Key.shift):
-                    sleep_key(0.001)
                     keyboard.press(letter_vk)
-                    sleep_key(0.001)
+                    sleep_key(0.0005)
                     keyboard.release(letter_vk)
 
             # Else just press like a usuall button
             else:
                 keyboard.press(letter_vk)
-                sleep_key(0.001)
+                sleep_key(0.0005)
                 keyboard.release(letter_vk)
-            sleep_key(0.001)
+            sleep_key(0.0005)
 
         # Successfully send the message by pressing enter
         keybd_event(key_bindings['ENTER'], 0, 0, 0)
@@ -258,6 +257,14 @@ def paste_in_chat(txt_msg, chat):
 def main():
     # Initialize overlay
     overlay_init()
+
+    # Pre-render the overlay once to warm up fonts/GPU and avoid first-show delay
+    try:
+        overlay_show_for_category(0, ["", "", "", ""])  # minimal content
+        overlay_pump_events()
+        overlay_hide(duration_ms=50)
+    except Exception:
+        pass
 
     # Press F1 to start the code
     while not(is_key_pressed(key_bindings['RLAC_START'])):
