@@ -1,8 +1,8 @@
 import sys
 import ctypes
-from win32api import keybd_event, GetKeyState
-from pynput.keyboard import Controller, Key, KeyCode
 import time
+from win32api import keybd_event
+from pynput.keyboard import Controller, Key, KeyCode
 from config import *
 from random import choice
 from lang_determ import *
@@ -10,6 +10,12 @@ from PyQt5.QtWidgets import QApplication
 from visuals import FramelessOverlay
 import win32gui
 import win32con
+
+# pynput controller used to emulate keystrokes. It is created at module
+# import time on purpose: previously it was only created under
+# `if __name__ == '__main__'`, which caused NameError if any function
+# from this module was imported elsewhere.
+keyboard = Controller()
 
 # Check whether the key is pressed
 def is_key_pressed(key):
@@ -19,15 +25,15 @@ def is_key_pressed(key):
 
 # Safely exit the script
 def safe_exit():
-    capslock_state = GetKeyState(0x14) & 0x0001
-    # Do not touch CapsLock on exit
-
-    # Releasing keys that might be pressed
+    # Release only keys that are actually held down right now. Sending
+    # KEYUP for every key in key_bindings (incl. F1/F2/T/Y/1..5) is
+    # unnecessary and can interfere with the user's other apps.
     for _, key_code in key_bindings.items():
-        keybd_event(key_code, 0, KEYEVENTF_KEYUP, 0)
-        sleep_key(1 / MONITOR_REFRESH_RATE)
+        if is_key_pressed(key_code):
+            keybd_event(key_code, 0, KEYEVENTF_KEYUP, 0)
+            sleep_key(1 / MONITOR_REFRESH_RATE)
 
-    # Restore initial keyboard layout once
+    # Restore initial keyboard layout once (best-effort).
     try:
         if initial_keyboard_layout is not None and lang_switch_keys is not None:
             tries = 0
@@ -35,6 +41,13 @@ def safe_exit():
                 press_lang_switch(lang_switch_keys[0], lang_switch_keys[1])
                 sleep_key(0.02)
                 tries += 1
+    except Exception:
+        pass
+
+    # Cleanly tear down the Qt application if it exists.
+    try:
+        if overlay_app is not None:
+            overlay_app.quit()
     except Exception:
         pass
 
@@ -52,16 +65,22 @@ def overlay_init():
     global overlay_app, overlay_win
     if overlay_app is not None:
         return
-    INTERFACE_SCALE = 100
-    default = {'left':16,'top':470,'width':395,'height':260}
-    left = int(default['left'] * INTERFACE_SCALE/100)
-    top = int(default['top'] * INTERFACE_SCALE/100)
-    width = int(default['width'] * INTERFACE_SCALE/100)
-    height = int(default['height'] * INTERFACE_SCALE/100)
-    wp = {'left':left,'top':top,'width':width,'height':height}
+
+    # INTERFACE_SCALE and OVERLAY_POSITION come from config.py — that's
+    # where the user is supposed to tweak the menu size to match the
+    # in-game HUD scale. See the comment block in config.py for details.
+    scale = INTERFACE_SCALE / 100.0
+    wp = {
+        'left':   int(OVERLAY_POSITION['left']   * scale),
+        'top':    int(OVERLAY_POSITION['top']    * scale),
+        'width':  int(OVERLAY_POSITION['width']  * scale),
+        'height': int(OVERLAY_POSITION['height'] * scale),
+    }
 
     overlay_app = QApplication(sys.argv)
-    overlay_win = FramelessOverlay(wp)
+    # Pass the scale to the overlay so that the painter inside scales
+    # fonts/paddings/line-offsets the same way the window is scaled.
+    overlay_win = FramelessOverlay(wp, scale=scale)
     overlay_win.hide()
 
     hwnd = int(overlay_win.winId())
@@ -98,6 +117,35 @@ def overlay_hide(duration_ms=200):
         overlay_pump_events()
 
 
+# ----------------------
+# Message rendering
+# ----------------------
+# Phrases in config.py may contain placeholders such as {shooting_code}
+# or {defence_code}. We substitute a random code from the corresponding
+# pool right before showing/sending the message. Missing/unknown
+# placeholders are left as empty strings instead of crashing.
+class _DefaultDict(dict):
+    """dict.format_map helper: unknown placeholders become empty strings."""
+    def __missing__(self, key):
+        return ''
+
+
+def _safe_choice(seq):
+    return choice(seq) if seq else ''
+
+
+def render_message(template):
+    if not isinstance(template, str) or '{' not in template:
+        return template
+    mapping = {
+        'shooting_code': _safe_choice(shooting_training_map_codes),
+        'defence_code':  _safe_choice(defence_training_map_codes),
+    }
+    try:
+        return template.format_map(_DefaultDict(mapping))
+    except Exception:
+        return template
+
 
 # # The function that remembers latest pressed keys (not working properly!)
 # def save_latest_keys():
@@ -114,37 +162,37 @@ def overlay_hide(duration_ms=200):
 
 # Expecting a second click after the first
 def second_click(first_click):
-    # Prepare four random static phrases (no training code appenders)
+    # Pick a random phrase per sub-category and render any
+    # {shooting_code}/{defence_code} placeholders right away so that the
+    # overlay shows exactly the same text that will be typed.
     overlay_msgs = []
     for sub_idx in range(4):
         options = quick_chat_messages[first_click][sub_idx]
-        # For category index 1 (COMPLIMENTS), sub 0 and 3 have training-code prompts at index 0
-        if first_click == 1 and sub_idx in (0, 3) and len(options) > 1:
-            msg = choice(options[1:])
-        else:
-            msg = choice(options)
-        overlay_msgs.append(msg)
+        overlay_msgs.append(render_message(choice(options) if options else ''))
 
     # Show overlay for the chosen category with pre-selected messages and start the timer
     overlay_show_for_category(first_click, overlay_msgs)
-    start_time = time.time()
+    start_time = time.perf_counter()
     fade_out_started = False
+
+    # Sub-category keys are exactly the same physical keys as the first
+    # click (1..4/5). We must not react to a key that is still held down
+    # from the first click; require a release-then-press by waiting until
+    # every category key is up before starting to listen.
+    while any(is_key_pressed(k) for k in quick_buttons_iterate):
+        overlay_pump_events()
+        sleep_key(0.002)
 
     try:
         while True:
             overlay_pump_events()
-            # Iterate to detect next keystroke
-            for key in quick_buttons_iterate:
+            for second_key, key in enumerate(quick_buttons_iterate):
                 if is_key_pressed(key):
-
                     # Instantly release the key (avoid false detection)
                     keybd_event(key, 0, KEYEVENTF_KEYUP, 0)
-                    
-                    second_key = quick_buttons_iterate.index(key)
 
                     # Visual selection feedback: bold chosen line, then fade out
                     try:
-                        # White color for selected text, configurable weight
                         overlay_win.set_selected_style(second_key, weight=65, color="#FFFFFF")
                         overlay_pump_events()
                     except Exception:
@@ -156,34 +204,43 @@ def second_click(first_click):
                     # Start faster fade-out while we begin typing (0.2s quicker)
                     overlay_hide(duration_ms=119)
 
-                    # Type the message in chat
                     paste_in_chat(text_message, first_click)
                     return
 
-            # ExitKey pressed during the loop? - exit the entire program
-            if is_key_pressed(key_bindings['RLAC_END']):
-                safe_exit()
-
-            # Check the timer
-            current_time = time.time()
-            elapsed_time = current_time - start_time
+            elapsed_time = time.perf_counter() - start_time
 
             # Start early fade-out 0.2s before timeout
             if not fade_out_started and elapsed_time >= max(0.0, WAIT_TIME_SECOND_CLICK - 0.2):
                 fade_out_started = True
                 overlay_hide()
 
-            # If the time has run out, exit the loop
             if elapsed_time >= WAIT_TIME_SECOND_CLICK:
                 return
+
+            # Yield CPU. ~2 ms gives ~500 Hz polling which is more than
+            # enough for human reaction times, instead of pegging a core.
+            # sleep_key also polls RLAC_END and triggers safe_exit
+            # automatically if pressed.
+            sleep_key(0.002)
     finally:
         overlay_hide()
 
 
-# Quickly type message in chat
+# Quickly type message in chat.
+# `chat` is the first-click category index (0..N-1). In Rocket League
+# the INFORMATIONAL category (index 0) is a team-only chat, while every
+# other category (COMPLIMENTS / REACTIONS / APOLOGIES / CUSTOM) goes to
+# the all-chat. That mirrors the in-game behaviour, so we route the
+# message accordingly.
 def paste_in_chat(txt_msg, chat):
+    # Bail out fast if the user pressed the exit key while the overlay
+    # was still up.
+    if is_key_pressed(key_bindings['RLAC_END']):
+        return
 
-    # Prepare layout variables once (no switching yet)
+    # Lazily remember the user's original keyboard layout and detect a
+    # working language-switch hotkey on the first call. Both are reused
+    # later by safe_exit() to restore the layout on shutdown.
     global initial_keyboard_layout, lang_switch_keys
     if initial_keyboard_layout is None:
         try:
@@ -191,67 +248,70 @@ def paste_in_chat(txt_msg, chat):
             lang_switch_keys = determ_change_lang_keys()
         except Exception:
             initial_keyboard_layout, lang_switch_keys = None, None
-    # Do not touch CapsLock anymore
 
-    while not(is_key_pressed(key_bindings['RLAC_END'])):
-        overlay_hide()
-        
-        # Determine in what chat we need to type
-        if chat:
-            chat_type = key_bindings['TEXT_CHAT_ALL']
-        else:
-            chat_type = key_bindings['TEXT_CHAT_PARTY']
-        
-        # Open the chat — slightly increased delays to avoid truncation on rapid key sequences
-        # sleep_key(0.023)
-        keybd_event(chat_type, 0, 0, 0)
-        sleep_key(0.001)
-        keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
-        sleep_key(0.02)
+    overlay_hide()
 
-        # Ensure English layout AFTER chat field receives focus (game may reset layout)
-        try:
-            if not is_english_layout_hex(get_keyboard_layout_name()):
-                keys_local = lang_switch_keys if lang_switch_keys else determ_change_lang_keys()
-                if keys_local:
-                    for _ in range(6):
-                        if is_english_layout_hex(get_keyboard_layout_name()):
-                            break
-                        press_lang_switch(keys_local[0], keys_local[1])
-                        sleep_key(0.02)
-                    if not lang_switch_keys and keys_local:
-                        lang_switch_keys = keys_local
-        except Exception:
-            pass
+    # See function docstring: INFORMATIONAL (index 0) -> team chat,
+    # anything else -> all-chat.
+    if chat:
+        chat_type = key_bindings['TEXT_CHAT_ALL']
+    else:
+        chat_type = key_bindings['TEXT_CHAT_PARTY']
 
-        # Iterate over each letter in text message
-        for letter in txt_msg:
-            letter_vk = KeyCode().from_vk(VkKeyScan_(letter))
+    # Open the chat — small delays avoid truncation on rapid key sequences.
+    keybd_event(chat_type, 0, 0, 0)
+    sleep_key(0.001)
+    keybd_event(chat_type, 0, KEYEVENTF_KEYUP, 0)
+    sleep_key(0.02)
 
-            # Check if the key needs to be written with the shift pressed
-            if letter.isupper() or letter in shift_symbols:
+    # Ensure English layout AFTER chat field receives focus (game may
+    # reset layout when the chat box opens).
+    try:
+        if not is_english_layout_hex(get_keyboard_layout_name()):
+            keys_local = lang_switch_keys if lang_switch_keys else determ_change_lang_keys()
+            if keys_local:
+                for _ in range(6):
+                    if is_english_layout_hex(get_keyboard_layout_name()):
+                        break
+                    press_lang_switch(keys_local[0], keys_local[1])
+                    sleep_key(0.02)
+                if not lang_switch_keys and keys_local:
+                    lang_switch_keys = keys_local
+    except Exception:
+        pass
 
-                # Press the key with shift pressed
-                with keyboard.pressed(Key.shift):
-                    keyboard.press(letter_vk)
-                    sleep_key(0.0005)
-                    keyboard.release(letter_vk)
+    # Iterate over each letter in text message
+    for letter in txt_msg:
+        scan = VkKeyScan_(letter)
+        # VkKeyScan returns -1 if the char cannot be produced on the
+        # current layout. Skip such characters instead of feeding -1
+        # back into pynput.
+        if scan == -1:
+            continue
+        # Low byte is the VK code, high byte holds modifier flags
+        # (0x01=Shift, 0x02=Ctrl, 0x04=Alt). We handle Shift manually
+        # below, so strip the modifier bits here.
+        letter_vk = KeyCode.from_vk(scan & 0xFF)
+        needs_shift = bool(scan & 0x0100) or letter.isupper() or letter in shift_symbols
 
-            # Else just press like a usuall button
-            else:
+        if needs_shift:
+            with keyboard.pressed(Key.shift):
                 keyboard.press(letter_vk)
                 sleep_key(0.0005)
                 keyboard.release(letter_vk)
+        else:
+            keyboard.press(letter_vk)
             sleep_key(0.0005)
+            keyboard.release(letter_vk)
+        sleep_key(0.0005)
 
-        # Successfully send the message by pressing enter
-        keybd_event(key_bindings['ENTER'], 0, 0, 0)
-        sleep_key()
-        keybd_event(key_bindings['ENTER'], 0, KEYEVENTF_KEYUP, 0)
+    # Send the message
+    keybd_event(key_bindings['ENTER'], 0, 0, 0)
+    sleep_key()
+    keybd_event(key_bindings['ENTER'], 0, KEYEVENTF_KEYUP, 0)
 
-        # Keep English layout during runtime; do not restore per-message
-        sleep_key(0.05)
-        return
+    # Keep English layout during runtime; do not restore per-message.
+    sleep_key(0.05)
 
 
 def main():
@@ -266,38 +326,31 @@ def main():
     except Exception:
         pass
 
-    # Press F1 to start the code
-    while not(is_key_pressed(key_bindings['RLAC_START'])):
-        pass
+    # Press F1 to start the script. sleep_key yields the CPU and also
+    # polls RLAC_END, so the user can quit while the script is still
+    # in its idle "waiting for F1" phase.
+    while not is_key_pressed(key_bindings['RLAC_START']):
+        overlay_pump_events()
+        sleep_key(0.01)
     keybd_event(key_bindings['RLAC_START'], 0, KEYEVENTF_KEYUP, 0)
 
-    # Get info about CapsLock key state
-    capslock_state = GetKeyState(0x14) & 0x0001
-
-    # Change the CapsLock flag if the key's state is 1
-    if capslock_state:
-        global capslock_flag
-        capslock_flag = not(capslock_flag)
-
-    # Waiting for pressing the quick chat button
+    # Main loop: wait for a category key press.
     while True:
         overlay_pump_events()
-        for key in quick_buttons_iterate:
+        for idx, key in enumerate(quick_buttons_iterate):
             if is_key_pressed(key):
-
                 # Instantly release the key (avoid false detection)
                 keybd_event(key, 0, KEYEVENTF_KEYUP, 0)
-                second_click(quick_buttons_iterate.index(key))
+                second_click(idx)
                 break
-    
-        # Check wether the exit button pressed
-        if is_key_pressed(key_bindings['RLAC_END']):
-            safe_exit()
 
-        sleep_key(0.001)
+        # ~500 Hz poll; sleep_key handles RLAC_END internally.
+        sleep_key(0.002)
 
-if __name__ =='__main__':
-    
-    keyboard = Controller()
 
+if __name__ == '__main__':
+    # Wire sleep_key (defined in lang_determ) so that whenever the user
+    # presses RLAC_END *during* any internal sleep, we tear down cleanly
+    # via safe_exit(). This replaces dozens of ad-hoc stop checks.
+    set_stop_handler(safe_exit)
     main()

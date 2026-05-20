@@ -57,9 +57,13 @@ else:
         "Defender of the year, right here!"
         ]
 
-# Mind that msg with codes should be first in the list
+    # You can embed random training-map codes by using these placeholders
+    # anywhere inside a phrase:
+    #   {shooting_code} — random code from shooting_training_map_codes
+    #   {defence_code}  — random code from defence_training_map_codes
     quick_chat_2_1 = [
-        "Oh, God, I hope this will help: ",
+        "Oh, God, I hope this will help: {shooting_code}",
+        "Try this for your aim: {shooting_code}",
         "Mind blowing shot!",
         "Did you program the AI to shot like that?",
         "Nice shot! If you were aiming for the bleachers!",
@@ -80,9 +84,10 @@ else:
         "Much appreciated!"
         ]
 
-# Mind that msg with codes should be first in the list
+    # Same placeholder mechanic as quick_chat_2_1, but for save training.
     quick_chat_2_4 = [
-        "Here's the code for practicing saves: ",
+        "Here's the code for practicing saves: {defence_code}",
+        "Maybe try this map for your saves: {defence_code}",
         "You'd better not try to save it!",
         "A child of 3 yo can save that. You not tho :)",
         "My Lord, who am I playing with?",
@@ -211,8 +216,11 @@ else:
     # Category titles (should match the number of quick_chat_messages categories)
     category_titles = ['INFORMATIONAL', 'COMPLIMENTS', 'REACTIONS', 'APOLOGIES', 'CUSTOM']
 
-    # List of map codes that you would recommend practicing to your team/opponents
-    shooting_trainig_map_codes = [
+    # Pools of training-map codes substituted into phrases that use
+    # the {shooting_code} / {defence_code} placeholders. Add or remove
+    # entries freely; if the corresponding pool is empty, the
+    # placeholder simply expands to an empty string.
+    shooting_training_map_codes = [
         "EC70-54C0-9928-E6BC",
         "42BF-686D-E047-574B",
         "2D89-9321-42D2-48BA",
@@ -221,7 +229,7 @@ else:
         "E146-BD21-EBE3-8D47"
         ]
 
-    defence_trainig_map_codes = [
+    defence_training_map_codes = [
         "2E68-0A19-F54F-D41F",
         "5CCE-FB29-7B05-A0B1",
         "3420-F216-ED7C-8011",
@@ -229,6 +237,10 @@ else:
         "5CB2-6D82-1B54-47B7",
         "99E5-4AA3-60D5-44BD"
         ]
+
+    # Backwards-compatible aliases for the previous (misspelled) names.
+    shooting_trainig_map_codes = shooting_training_map_codes
+    defence_trainig_map_codes = defence_training_map_codes
 
     # Values set due that table:
     # https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
@@ -256,10 +268,13 @@ else:
         key_bindings['CUSTOM']
                   ]
 
-    # Symbols that need to be printed with shift pressed
+    # Symbols that need to be printed with shift pressed (US layout).
+    # NOTE: this set is a fallback used by paste_in_chat() in addition
+    # to the modifier bit returned by VkKeyScanExW. Keep it complete to
+    # be safe if users add new phrases with these characters.
     shift_symbols = {
         '!','@','#','$','%','^','&','*','(',')',
-        '{','}','"',':','_','+','<','>','?','~'
+        '{','}','"',':','_','+','<','>','?','~','|'
         }
 
     # *In the development of the last keystrokes*
@@ -288,3 +303,40 @@ else:
 
     # Monitor refresh rate (Hz)
     MONITOR_REFRESH_RATE = 144
+
+    # -------------------------------------------------------------------------
+    # Overlay (in-game quick-chat menu) appearance
+    # -------------------------------------------------------------------------
+    # INTERFACE_SCALE matches Rocket League's HUD scale slider, which
+    # in-game ranges from 50 to 100 (%). The overlay window *and*
+    # everything painted inside it (fonts, paddings, line spacing,
+    # glow) are multiplied by INTERFACE_SCALE / 100. So if you set
+    # Rocket League's HUD scale to 80, set INTERFACE_SCALE = 80 here
+    # too — and the menu will look 1:1 with the in-game quick chat.
+    #
+    # NOTE: this is NOT the Windows display scaling (the 100/125/150%
+    # setting in Windows). That one is handled by the OS automatically
+    # because this script intentionally runs as a non-DPI-aware app, so
+    # whatever you see in the game is what you get here as well.
+    INTERFACE_SCALE = 100
+
+    # Anchor of the overlay rectangle, in DESIGN pixels — i.e. pixels
+    # at the reference resolution declared in BASE_RESOLUTION below.
+    # These values are calibrated for Rocket League's default quick
+    # chat at HUD scale 100%. After INTERFACE_SCALE is applied (and,
+    # eventually, the resolution factor — see TODO), the actual
+    # on-screen position becomes:
+    #     left   = OVERLAY_POSITION['left']   * INTERFACE_SCALE / 100
+    #     top    = OVERLAY_POSITION['top']    * INTERFACE_SCALE / 100
+    #     width  = OVERLAY_POSITION['width']  * INTERFACE_SCALE / 100
+    #     height = OVERLAY_POSITION['height'] * INTERFACE_SCALE / 100
+    # The overlay is shown on whichever monitor those coordinates land
+    # on (Windows treats the primary monitor's top-left as (0, 0)).
+    OVERLAY_POSITION = {'left': 16, 'top': 470, 'width': 395, 'height': 260}
+
+    # Resolution at which OVERLAY_POSITION and every hard-coded value
+    # inside visuals.py was originally hand-calibrated. Currently used
+    # only as documentation; the eventual auto-adaptation logic will
+    # read this constant to compute the resolution_factor.
+    # See TODO.md (sections #1 and #2) for the plan.
+    BASE_RESOLUTION = (1920, 1080)

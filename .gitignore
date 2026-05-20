@@ -1,0 +1,20 @@
+# Python bytecode caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local archives / backups
+*.zip
+
+# Tuner output — environment-specific, not meant to be committed
+overlay_presets.json
+
+# IDE / editor folders
+.vscode/
+.idea/
+.cursor/
+
+# OS junk
+Thumbs.db
+.DS_Store
