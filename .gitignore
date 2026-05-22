@@ -7,9 +7,6 @@ __pycache__/
 # Local archives / backups
 *.zip
 
-# Tuner output — environment-specific, not meant to be committed
-overlay_presets.json
-
 # IDE / editor folders
 .vscode/
 .idea/

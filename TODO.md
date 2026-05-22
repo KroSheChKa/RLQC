@@ -82,11 +82,11 @@ per-frame cost.
 
 ---
 
-## 2. Automatic adaptation to non-Full-HD resolutions
+## 2. Automatic adaptation to arbitrary (resolution × HUD scale × Windows DPI)
 
-Status: pending — design notes already in `config.py`. Implementation
-deferred until enough tuner presets are collected (see
-`overlay_presets.json`).
+Status: pending — collecting calibration data. Reference points live
+in `presets/reference_presets.json` (committed). User-generated working
+presets live in `overlay_presets.json` (gitignored).
 
 ### Current state
 The whole UI (window geometry + paint params in `visuals.py`) is
@@ -97,41 +97,123 @@ menu still draws but everything is slightly off because Rocket League
 scales its HUD with screen **height**, while our coordinates are
 fixed.
 
+### THREE independent inputs we must combine
+
+The final scale depends on three knobs that the user (or the OS)
+controls separately. Conflating them is what bit us before:
+
+  1. **Screen resolution** — comes from `QApplication.primaryScreen()
+     .geometry().height()`. Auto-detected, no user input needed.
+     RL's HUD scales with height; ultrawides do NOT widen the menu.
+  2. **Windows display scale** — comes from
+     `screen.logicalDotsPerInch() / 96`. Auto-detected.
+     A 1920×1200 laptop running at 125% Windows scale draws a smaller
+     "logical" canvas than the same panel at 100%, so the menu must
+     compensate.
+  3. **In-game HUD scale** (50..100, integer percent) — CANNOT be
+     read from RL at all. Must be provided by the user. This is the
+     reason we need the first-run wizard in #2b below.
+
 ### Plan (dynamic, NOT presets per resolution)
 
-1. At `overlay_init()` in `RLQuickChat.py`, query the target
-   monitor's pixel height via
-   `QApplication.primaryScreen().geometry().height()`.
-2. Compute `resolution_factor = current_height / BASE_RESOLUTION[1]`.
-   Height-based, because RL's HUD scales with height; on ultrawides
-   the menu must NOT grow horizontally.
-3. Final scale used by `FramelessOverlay`:
+1. Read the auto-detectable inputs at `overlay_init()` time:
    ```
-   final_scale = resolution_factor * (INTERFACE_SCALE / 100)
+   h_px         = QApplication.primaryScreen().geometry().height()
+   win_scale_pc = round(screen.logicalDotsPerInch() / 96 * 100)
    ```
-   `INTERFACE_SCALE` keeps its current meaning (the user's HUD-scale
-   slider 50..100), the resolution multiplier is applied transparently
-   underneath.
-4. Apply the same factor to `OVERLAY_POSITION['top']`/`'left'` so the
-   menu stays anchored to the same relative spot on screen.
+2. Read the user-provided HUD scale from config / wizard output:
+   `hud_pc` (integer in 50..100).
+3. Compute the final per-axis multipliers:
+   ```
+   resolution_factor = h_px / BASE_RESOLUTION[1]   # 1080
+   windows_factor    = win_scale_pc / 100
+   hud_factor        = hud_pc / 100
+   final_scale       = resolution_factor * hud_factor * windows_factor
+   ```
+   (May need a separate horizontal factor if data shows ultrawides
+   need an explicit horizontal correction — see Data points below.)
+4. Apply `final_scale` to BOTH window geometry (left / top / width /
+   height in OVERLAY_POSITION) AND every value inside
+   `FramelessOverlay.DEFAULT_STYLE`. This is what `scale_factor`
+   already does for `style` — we just need to also stretch the
+   window box and the anchor.
 
-### Data needed before implementing
-Run `python tuner.py` on a few combinations and save presets:
+   Note: `selected_letter_spacing` is one of the keys that **does**
+   scale (it's a per-pixel-density value, calibrated by eye in the
+   tuner). The other two parts of the "selected" look — colour
+   (`SELECTED_COLOR = #FFFFFF`) and weight (`SELECTED_WEIGHT = 75`)
+   — are intentionally NOT in the style dict because they are
+   game-fixed; the auto-adaptation formula must leave them alone.
 
-- Full HD 1920×1080, HUD = 50 / 75 / 100, Windows scale = 100% / 125%
-- QHD 2560×1440, HUD = 50 / 75 / 100, Windows scale = 100% / 125%
-- Ultrawide 3440×1440, HUD = 50 / 75 / 100, Windows scale = 100% / 125%
+### Data points (calibration log)
 
-With those points we can plot `(value vs HUD)` and `(value vs height)`
-and confirm the formula above (or pick a slightly different one).
+Each new tuner-saved preset that we deem "pixel-perfect" should also
+be added to `presets/reference_presets.json` so the file accumulates
+real measurements. Once we have ≥ 3 points spanning different
+resolutions and HUD scales at the same Windows DPI, we can plot
+each style key against (height, hud) and verify (or correct) the
+formula above. Already-calibrated:
+
+  - **3440×1440 / HUD 100 / WinScale 100** — saved 2026-05-22, see
+    `presets/reference_presets.json`. Pixel-perfect except for the
+    right-edge fade (linear gradient — known issue, see #1).
+
+Still needed (priority order):
+
+  - 1920×1080 / HUD 100 / WinScale 100 (the original baseline that the
+    code claims to match — verify, sanity check).
+  - 1920×1200 / HUD 100 / WinScale 125 (laptop case; the +120 px in
+    height combined with Windows 125% scaling is exactly the case
+    that's most likely to expose a bug in the formula).
+  - 3440×1440 / HUD 75 and HUD 50, WinScale 100 (varies only HUD).
+  - 1920×1080 / HUD 75 and HUD 50, WinScale 100 (cross-check HUD axis
+    on the baseline resolution).
 
 ### Sanity checks when implementing
-- Full HD 100%: no visual change vs. today.
-- QHD 100%: menu grows ~1.33×, still aligned with in-game chat.
-- Ultrawide 1440p: menu grows ~1.33× (height-based, NOT stretched
-  horizontally).
-- Any resolution × INTERFACE_SCALE ∈ {50, 75, 100}: matches the
-  in-game quick chat at the same HUD-scale setting.
+
+  - 1920×1080 / HUD 100 / WinScale 100: no visual change vs. today.
+  - 3440×1440 / HUD 100 / WinScale 100: matches the saved preset
+    `3440x1440_hud100_winscale100` byte-for-byte.
+  - Any resolution × HUD ∈ {50, 75, 100} × WinScale ∈ {100, 125, 150}:
+    matches the in-game quick chat at the same HUD-scale setting.
+
+---
+
+## 2b. First-run wizard — collect inputs we can't auto-detect
+
+Status: pending. Blocks #2 from being usable for end-users.
+
+`hud_scale` (the in-game HUD slider) is impossible to read from
+outside the game. We need a tiny one-time UI to ask the user. The
+absence of this is the single reason #2 is currently a "developer
+tool" only.
+
+### Plan
+
+1. On every script start (or only when no `user_settings.json` exists
+   yet), check for the saved HUD value. If missing → spawn the
+   wizard before `main()` continues.
+2. Wizard window (PyQt5, small, modal-ish):
+   - Friendly explainer: "We need to know your in-game HUD scale.
+     Open Rocket League, Settings → Display → HUD scale. Enter the
+     value you see below."
+   - `QSpinBox` 50..100, default 100.
+   - Optional toggle "I never change my HUD scale — remember this".
+   - "Save & continue" button → writes the value to e.g.
+     `user_settings.json` next to the script.
+3. Add a manual entry point — keystroke / CLI flag / menu item —
+   to re-open the wizard later when the user changes their HUD.
+4. Plug the result into the formula in #2 above. If a saved value is
+   present we skip the wizard silently.
+
+### Where to store
+`user_settings.json` (gitignored, like `overlay_presets.json`):
+```json
+{
+  "hud_scale": 100,
+  "saved_at": "..."
+}
+```
 
 ---
 
@@ -158,6 +240,35 @@ All of these were addressed earlier — kept here as a changelog:
   `paintEvent` (was previously only scaling the window box).
 - `FramelessOverlay.DEFAULT_STYLE` introduced so all magic numbers
   are editable at runtime (used by `tuner.py`).
+
+---
+
+## 3b. Slim down DEFAULT_STYLE — extract truly-constant values
+
+Status: pending. Wait until enough reference presets are collected.
+
+Once we have several `presets/reference_presets.json` entries we can
+diff them and see which `style` keys are **identical across every
+preset** (i.e. they don't actually depend on resolution / HUD scale /
+Windows DPI — the user never touched them in the tuner either).
+
+Those keys should leave `FramelessOverlay.DEFAULT_STYLE` and become
+plain module-level constants in `visuals.py`. Benefits:
+
+- `style` dict shrinks → tuner only shows knobs that actually matter.
+- The auto-adaptation formula in #2 needs to scale fewer values.
+- Less noise in saved presets — JSON stays small and meaningful.
+
+Likely candidates already, based on the first preset (untouched
+fields):
+  * `color_blue`, `color_white`
+  * `outline_width`, `glow_layers`, `glow_max_width`, `glow_base_alpha`
+  * `bg_alpha`
+  * `nums_font_weight`, `msgs_font_weight`
+
+Don't act on the list above yet — confirm against ≥ 2 more presets
+before removing them. The whole point is to base the decision on
+real data, not guesses.
 
 ---
 

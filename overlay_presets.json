@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "presets": {
+    "3440x1440_hud100_winscale100": {
+      "saved_at": "2026-05-22T05:16:51",
+      "environment": {
+        "resolution": [
+          3440,
+          1440
+        ],
+        "logical_size": [
+          3440,
+          1440
+        ],
+        "device_pixel_ratio": 1.0,
+        "logical_dpi": 96.0,
+        "physical_dpi": 109.57004936175328,
+        "windows_scale_percent": 100
+      },
+      "metadata": {
+        "game_hud_scale": 100,
+        "notes": ""
+      },
+      "interface_scale": 100,
+      "window": {
+        "left": 25,
+        "height": 310,
+        "width": 450,
+        "top": 566
+      },
+      "style": {
+        "bg_alpha": 196,
+        "fade_top": 8,
+        "fade_bottom": 8,
+        "fade_left": 20,
+        "fade_right": 190,
+        "color_blue": "#43B1FE",
+        "color_white": "#FFFFFF",
+        "header1_x": 38,
+        "header1_y": 39,
+        "header1_font_size": 22.0,
+        "header1_letter_spacing": 2.3000000000000003,
+        "header2_x": 38,
+        "header2_y": 76,
+        "header2_font_size": 28.0,
+        "header2_letter_spacing": 2.6000000000000005,
+        "outline_width": 1.3,
+        "glow_layers": 8,
+        "glow_max_width": 14,
+        "glow_base_alpha": 32,
+        "nums_left": 50,
+        "nums_top": 127,
+        "nums_font_size": 23.0,
+        "nums_font_weight": 50,
+        "msgs_left": 93,
+        "msgs_font_size": 23.0,
+        "msgs_font_weight": 50,
+        "msgs_letter_spacing": 0.49999999999999933,
+        "line_offset": 48,
+        "right_padding": 20
+      }
+    },
+    "3440x1440_hud100_winscale100_new_background": {
+      "saved_at": "2026-05-22T06:42:37",
+      "environment": {
+        "resolution": [
+          3440,
+          1440
+        ],
+        "logical_size": [
+          3440,
+          1440
+        ],
+        "device_pixel_ratio": 1.0,
+        "logical_dpi": 96.0,
+        "physical_dpi": 109.57004936175328,
+        "windows_scale_percent": 100
+      },
+      "metadata": {
+        "game_hud_scale": 100,
+        "notes": ""
+      },
+      "interface_scale": 100,
+      "window": {
+        "top": 566,
+        "width": 484,
+        "height": 310,
+        "left": 4
+      },
+      "style": {
+        "bg_color": "#000000",
+        "bg_alpha": 200,
+        "fade_top": 10,
+        "fade_bottom": 10,
+        "fade_left": 400,
+        "fade_right": 225,
+        "fade_bezier_x": 0.7,
+        "fade_bezier_y": 0.33,
+        "fade_top_offset": 0.0,
+        "fade_bottom_offset": 0.0,
+        "fade_left_offset": 0.9,
+        "fade_right_offset": 0.0,
+        "color_blue": "#43B1FE",
+        "color_white": "#FFFFFF",
+        "header1_x": 59,
+        "header1_y": 39,
+        "header1_font_size": 22.0,
+        "header1_letter_spacing": 2.3000000000000003,
+        "header2_x": 59,
+        "header2_y": 76,
+        "header2_font_size": 28.0,
+        "header2_letter_spacing": 2.6000000000000005,
+        "outline_width": 1.3,
+        "glow_layers": 8,
+        "glow_max_width": 14,
+        "glow_base_alpha": 32,
+        "nums_left": 71,
+        "nums_top": 127,
+        "nums_font_size": 23.0,
+        "nums_font_weight": 50,
+        "msgs_left": 114,
+        "msgs_font_size": 23.0,
+        "msgs_font_weight": 50,
+        "msgs_letter_spacing": 0.49999999999999933,
+        "line_offset": 48,
+        "right_padding": 42
+      }
+    }
+  }
+}

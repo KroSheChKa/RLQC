@@ -46,9 +46,11 @@ from collections import OrderedDict
 from datetime import datetime
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
+    QColorDialog,
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
@@ -96,11 +98,19 @@ PARAMS = [
     ("Scale", "interface_scale", "INTERFACE_SCALE (%)", int,   30,  200, 1),
 
     # ---- Background panel & edge fade ----
-    ("Background",  "bg_alpha",    "Background alpha (0..255)", int, 0, 255, 1),
-    ("Background",  "fade_top",    "Fade top (px)",             int, 0, 200, 1),
-    ("Background",  "fade_bottom", "Fade bottom (px)",          int, 0, 200, 1),
-    ("Background",  "fade_left",   "Fade left (px)",            int, 0, 400, 1),
-    ("Background",  "fade_right",  "Fade right (px)",           int, 0, 800, 1),
+    ("Background",  "bg_alpha",          "Background alpha (0..255)", int,   0,   255, 1),
+    ("Background",  "fade_top",          "Fade top (px)",             int,   0,   200, 1),
+    ("Background",  "fade_bottom",       "Fade bottom (px)",          int,   0,   200, 1),
+    ("Background",  "fade_left",         "Fade left (px)",            int,   0,   400, 1),
+    ("Background",  "fade_right",        "Fade right (px)",           int,   0,   800, 1),
+    ("Background",  "fade_top_offset",   "Top opaque hold (0..0.95)", float, 0.0, 0.95, 0.05),
+    ("Background",  "fade_bottom_offset","Bottom opaque hold",        float, 0.0, 0.95, 0.05),
+    ("Background",  "fade_left_offset",  "Left opaque hold",          float, 0.0, 0.95, 0.05),
+    ("Background",  "fade_right_offset", "Right opaque hold",         float, 0.0, 0.95, 0.05),
+
+    # ---- Shared Bezier curve for all 4 edge fades ----
+    ("Fade curve (Bezier)", "fade_bezier_x", "Control X (0..1)", float, 0.0, 1.0, 0.01),
+    ("Fade curve (Bezier)", "fade_bezier_y", "Control Y (0..1)", float, 0.0, 1.0, 0.01),
 
     # ---- 'QUICK CHAT' header ----
     ("Header 'QUICK CHAT'", "header1_x",              "X (px)",          int,   0,  400, 1),
@@ -127,10 +137,17 @@ PARAMS = [
     ("Numbers (1..4)", "nums_font_weight", "Font weight",     int,   1,   99,  1),
 
     # ---- Phrase column ----
-    ("Phrases", "msgs_left",        "X (px)",          int,   0,  600, 1),
-    ("Phrases", "msgs_font_size",   "Font size (pt)",  float, 1.0, 80.0, 0.5),
-    ("Phrases", "msgs_font_weight", "Font weight",     int,   1,   99,  1),
-    ("Phrases", "right_padding",    "Right padding (px)", int, 0, 400, 1),
+    ("Phrases", "msgs_left",            "X (px)",            int,   0,   600, 1),
+    ("Phrases", "msgs_font_size",       "Font size (pt)",    float, 1.0, 80.0, 0.5),
+    ("Phrases", "msgs_font_weight",     "Font weight",       int,   1,   99,  1),
+    ("Phrases", "msgs_letter_spacing",  "Letter spacing",    float, 0.0, 10.0, 0.1),
+    ("Phrases", "right_padding",        "Right padding (px)",int,   0,   400, 1),
+
+    # ---- Selected phrase (row #2 is pinned selected in the tuner preview) ----
+    # Only letter-spacing is tunable: colour (white) and weight (bold)
+    # are dictated by the game itself — see SELECTED_COLOR /
+    # SELECTED_WEIGHT in visuals.py for the rationale.
+    ("Selected phrase", "selected_letter_spacing", "Letter spacing", float, 0.0, 20.0, 0.1),
 
     # ---- Row spacing ----
     ("Rows", "line_offset", "Line offset (px)", int, 1, 200, 1),
@@ -233,6 +250,80 @@ class ParamControl(QWidget):
 
         if emit:
             self.on_change(self.key, value)
+
+
+class ColorControl(QWidget):
+    """Label + hex line-edit + colour swatch + 'Pick…' button.
+
+    The hex line-edit is the source of truth — typing an unknown value
+    leaves the swatch grey until valid.  Picking via QColorDialog
+    writes back a `#RRGGBB` string.
+    """
+
+    def __init__(self, key, label, value, on_change):
+        super().__init__()
+        self.key = key
+        self.on_change = on_change
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        self.label = QLabel(label)
+        self.label.setMinimumWidth(180)
+        layout.addWidget(self.label)
+
+        self.swatch = QLabel()
+        self.swatch.setFixedSize(28, 22)
+        self.swatch.setStyleSheet("border: 1px solid #888;")
+        layout.addWidget(self.swatch)
+
+        self.edit = QLineEdit()
+        self.edit.setMaximumWidth(110)
+        self.edit.setPlaceholderText("#RRGGBB")
+        layout.addWidget(self.edit, 1)
+
+        btn = QPushButton("Pick…")
+        btn.clicked.connect(self._open_picker)
+        layout.addWidget(btn)
+
+        self.set_value(value, emit=False)
+        self.edit.editingFinished.connect(self._on_edit)
+
+    def _apply_color_to_swatch(self, hex_str):
+        c = QColor(hex_str)
+        if not c.isValid():
+            self.swatch.setStyleSheet("border: 1px solid #888;")
+            return False
+        self.swatch.setStyleSheet(
+            f"background: {c.name()}; border: 1px solid #888;"
+        )
+        return True
+
+    def _on_edit(self):
+        text = self.edit.text().strip()
+        if not text.startswith('#'):
+            text = '#' + text
+        if self._apply_color_to_swatch(text):
+            self.edit.setText(text)
+            self.on_change(self.key, text)
+
+    def _open_picker(self):
+        initial = QColor(self.edit.text() or '#000000')
+        if not initial.isValid():
+            initial = QColor('#000000')
+        chosen = QColorDialog.getColor(initial, self, "Pick background colour")
+        if chosen.isValid():
+            self.set_value(chosen.name())
+
+    def set_value(self, value, emit=True):
+        text = str(value) if value else '#000000'
+        self.edit.blockSignals(True)
+        self.edit.setText(text)
+        self.edit.blockSignals(False)
+        self._apply_color_to_swatch(text)
+        if emit:
+            self.on_change(self.key, text)
 
 
 # -----------------------------------------------------------------------------
@@ -389,10 +480,27 @@ class TunerWindow(QWidget):
         for group, key, label, vtype, vmin, vmax, step in PARAMS:
             groups.setdefault(group, []).append((key, label, vtype, vmin, vmax, step))
 
+        # Some style entries are colours, not numbers, so they live
+        # outside PARAMS. Map each group to the colour-keys (and a
+        # human label for each) we want to render inside it.
+        group_colors = {
+            "Background": [("bg_color", "Panel colour")],
+        }
+
         for gname, items in groups.items():
             gb = QGroupBox(gname)
             form = QVBoxLayout(gb)
             form.setSpacing(4)
+
+            for key, label in group_colors.get(gname, []):
+                color_ctrl = ColorControl(
+                    key, label,
+                    value=self.values.get(key, self._defaults.get(key, "#000000")),
+                    on_change=self._on_param_changed,
+                )
+                self.param_widgets[key] = color_ctrl
+                form.addWidget(color_ctrl)
+
             for key, label, vtype, vmin, vmax, step in items:
                 ctrl = ParamControl(
                     key, label, vtype, vmin, vmax, step,
@@ -442,6 +550,14 @@ class TunerWindow(QWidget):
         self.live_apply.setChecked(True)
         lay.addWidget(self.live_apply)
 
+        # Both headers share the same X offset from the left in the
+        # real RL quick chat, so by default we keep them locked
+        # together: dragging header1_x or header2_x moves the other
+        # one to the same value.
+        self.link_headers_x = QCheckBox("Link headers X")
+        self.link_headers_x.setChecked(True)
+        lay.addWidget(self.link_headers_x)
+
         btn_repaint = QPushButton("Force repaint")
         btn_repaint.clicked.connect(self.overlay.update)
         lay.addWidget(btn_repaint)
@@ -459,8 +575,23 @@ class TunerWindow(QWidget):
     # ----- value flow -----
     def _on_param_changed(self, key, value):
         self.values[key] = value
+
+        # Header X linking: keep both headers aligned to the same
+        # left margin when the user requested it. We update the *other*
+        # widget without emitting its change signal so we don't bounce
+        # back into this handler.
+        linked_partial = {key: value}
+        if self.link_headers_x.isChecked() and key in ("header1_x", "header2_x"):
+            other = "header2_x" if key == "header1_x" else "header1_x"
+            if self.values.get(other) != value:
+                self.values[other] = value
+                ctrl = self.param_widgets.get(other)
+                if ctrl is not None:
+                    ctrl.set_value(value, emit=False)
+                linked_partial[other] = value
+
         if self.live_apply.isChecked():
-            self._apply_overlay_values({key: value})
+            self._apply_overlay_values(linked_partial)
 
     def _apply_overlay_values(self, partial):
         """Apply a partial dict of values to the live overlay."""
@@ -655,10 +786,16 @@ def main():
     overlay = FramelessOverlay(wp, scale=initial_scale)
     overlay.set_content('COMPLIMENTS', [
         "Nice one!",
-        "Great pass!",
-        "Thanks for the save!",
+        "Great pass!",          # row #2 is always shown as 'selected'
+        "This is a deliberately very very very long test message",
         "What a save!",
     ])
+    # Pin row #2 to the selected state so the tuner can preview the
+    # letter-spacing / weight / colour applied to a highlighted line
+    # without having to actually press any key. The values come from
+    # FramelessOverlay.style (selected_letter_spacing, selected_weight,
+    # selected_color), so editing those sliders updates this row live.
+    overlay.set_selected_style(1)
     overlay.show()
     _force_topmost(overlay)
 

@@ -191,9 +191,12 @@ def second_click(first_click):
                     # Instantly release the key (avoid false detection)
                     keybd_event(key, 0, KEYEVENTF_KEYUP, 0)
 
-                    # Visual selection feedback: bold chosen line, then fade out
+                    # Visual selection feedback. Colour / weight of
+                    # the highlighted line are game-fixed inside
+                    # FramelessOverlay (white + bold); we just have
+                    # to tell the overlay WHICH line is selected.
                     try:
-                        overlay_win.set_selected_style(second_key, weight=65, color="#FFFFFF")
+                        overlay_win.set_selected_style(second_key)
                         overlay_pump_events()
                     except Exception:
                         pass

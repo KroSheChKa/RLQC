@@ -10,6 +10,34 @@ from PyQt5.QtGui import (
 from PyQt5.QtWidgets import QApplication, QWidget
 import math
 
+# ----------------------------------------------------------------------
+# "Selected phrase" style — game-fixed constants
+# ----------------------------------------------------------------------
+# When the user picks a phrase from the quick-chat menu, the in-game
+# overlay reacts in a very specific, non-customisable way:
+#
+#   * the text colour snaps to pure WHITE (#FFFFFF);
+#   * the font weight becomes noticeably heavier than the default
+#     (everything in the ~67-99 range looks correct in-game; 75 is
+#     a safe middle that matches "Bold");
+#   * there is NO glow / outline on the selected line itself — only
+#     the category header has a glow halo.
+#
+# Both of those properties are dictated by the game itself, not by
+# screen resolution, HUD scale or Windows DPI — so they are kept
+# here as module-level constants instead of polluting DEFAULT_STYLE.
+# The tuner deliberately does NOT expose sliders for them.
+#
+# The one selected-state value that DOES vary per pixel-density is
+# `selected_letter_spacing`, which still lives in DEFAULT_STYLE (and
+# in the tuner) because it has to be calibrated for each resolution
+# / UI-scale combo; see TODO.md #2 — the auto-adaptation formula
+# eventually scales it the same way it scales other geometry.
+# ----------------------------------------------------------------------
+SELECTED_COLOR  = "#FFFFFF"
+SELECTED_WEIGHT = 75
+
+
 class FramelessOverlay(QWidget):
     # ------------------------------------------------------------------
     # DEFAULT_STYLE
@@ -28,7 +56,8 @@ class FramelessOverlay(QWidget):
     # does. The runtime style is layered ON TOP of these defaults, so
     # any key not provided falls back here.
     DEFAULT_STYLE = {
-        # background opacity (0..255) of the dark panel behind text
+        # Colour of the dark panel and how opaque it is.
+        'bg_color': '#000000',
         'bg_alpha': 196,
 
         # gradient fade widths at the four edges (design px)
@@ -36,6 +65,24 @@ class FramelessOverlay(QWidget):
         'fade_bottom': 8,
         'fade_left': 20,
         'fade_right': 190,
+
+        # Edge-fade curve (shared across all four sides).
+        # Quadratic Bezier control point: P0=(0,1), P1=(bx,by), P2=(1,0).
+        #   (0.5, 0.5) -> pure linear fade (the historical look).
+        #   bx<0.5    -> fade ramps up faster early, then plateaus.
+        #   by>0.5    -> long opaque tail near the panel before fading.
+        # See _build_fade_gradient() for the parametric sampling.
+        'fade_bezier_x': 0.5,
+        'fade_bezier_y': 0.5,
+
+        # Per-side "offset": fraction of the fade region that stays
+        # fully opaque before the curve starts. 0.0 = fade begins at
+        # the inner edge (current behaviour). 0.4 = first 40% of the
+        # fade strip is solid panel and only then the curve kicks in.
+        'fade_top_offset':    0.0,
+        'fade_bottom_offset': 0.0,
+        'fade_left_offset':   0.0,
+        'fade_right_offset':  0.0,
 
         # primary blue used by header and message text
         'color_blue': '#43B1FE',
@@ -69,6 +116,14 @@ class FramelessOverlay(QWidget):
         'msgs_left': 82,
         'msgs_font_size': 16,
         'msgs_font_weight': 50,
+        'msgs_letter_spacing': 0.0,
+
+        # Selected phrase: only the letter-spacing value lives here,
+        # because that's the one part of the selection look that has
+        # to be re-calibrated per resolution / UI scale (see
+        # SELECTED_COLOR / SELECTED_WEIGHT module constants for the
+        # rest, which are game-fixed).
+        'selected_letter_spacing': 0.3,
 
         # vertical distance between consecutive numbered rows
         'line_offset': 40,
@@ -107,8 +162,6 @@ class FramelessOverlay(QWidget):
         self.msgs = ["Nice one!", "Great pass!", "Thanks!", "What a save!"]
         self.fade_anim = None
         self.selected_index = None
-        self.selected_weight = 65
-        self.selected_color = "#FFFFFF"
 
         bour_path = os.path.join(os.path.dirname(__file__), "fonts", "menu", "Bourgeois-Light.otf")
         if os.path.exists(bour_path):
@@ -145,15 +198,20 @@ class FramelessOverlay(QWidget):
         self.selected_index = None
         self.update()
 
-    def set_selection(self, idx, weight=75):
-        self.selected_index = idx
-        self.selected_weight = weight
-        self.update()
+    def set_selection(self, idx):
+        """Backwards-compatible alias of set_selected_style()."""
+        self.set_selected_style(idx)
 
-    def set_selected_style(self, idx, weight=75, color="#FFFFFF"):
+    def set_selected_style(self, idx, **_ignored):
+        """Mark the phrase at `idx` as selected.
+
+        Visual style of the highlighted line is fixed by the game
+        (see SELECTED_COLOR / SELECTED_WEIGHT module constants and
+        the `selected_letter_spacing` style key). Extra kwargs are
+        accepted and ignored for backwards compatibility with older
+        call sites that used to pass weight= / color=.
+        """
         self.selected_index = idx
-        self.selected_weight = weight
-        self.selected_color = color
         self.update()
 
     # --- runtime tweaking helpers (used by tuner.py) ---
@@ -217,6 +275,102 @@ class FramelessOverlay(QWidget):
         self.repaint()
         self._fade_to(1.0, duration_ms)
 
+    # ------------------------------------------------------------------
+    # Edge fade — quadratic Bezier sampled into a multi-stop gradient.
+    #
+    # The gradient is used as a CompositionMode_DestinationOut mask, so
+    # alpha=255 means "cut a hole here" and alpha=0 means "keep the
+    # panel visible". We design the curve in that mask-alpha space:
+    #
+    #   * t = 0  ⇒  inner edge of the fade strip  ⇒  alpha 0
+    #               (panel stays solid)
+    #   * t = 1  ⇒  outer edge of the fade strip  ⇒  alpha 255
+    #               (fully transparent)
+    #
+    # The Bezier P(t) = (1-t)²·(0,0) + 2(1-t)t·(bx,by) + t²·(1,1)
+    # bows between those two corners. With (bx, by) = (0.5, 0.5) it
+    # is the straight diagonal — i.e. the historical linear fade.
+    #
+    #   alpha ▲       P2=(1,1)
+    #     1   │       ╱
+    #         │      ╱       (bx,by) pulls the curve up/down or
+    #         │     ╱        early/late within the strip
+    #         │    ╱
+    #     0   P0──╯
+    #         └────────► position along the fade strip
+    #
+    # `offset` (0..0.95) is an opaque-panel "hold" of that fraction
+    # near the INNER edge: the panel stays fully visible for the first
+    # `offset` of the strip, then the Bezier curve starts. This matches
+    # how RL's in-game chat falloff feels — late and then soft.
+    # ------------------------------------------------------------------
+    def _draw_glowing_text(self, painter, path, fill_color, glow_color,
+                           outline_width, st):
+        """Render a text `path` with a double outline + soft outer glow.
+
+        Used for the category header (e.g. "COMPLIMENTS"):
+          * stroke the glyph path twice with the fill colour — this
+            is what visually thickens the header edge in-game;
+          * draw a few concentric strokes of `glow_color` whose
+            width grows from `outline_width` up to `glow_max_width`
+            while alpha falls from `glow_base_alpha` to 0 (cheap
+            fake-blur);
+          * fill the path with `fill_color`.
+
+        Intentionally NOT used for the selected-phrase line: in the
+        real game the selected phrase has no glow / no outline, only
+        a colour + weight change. See paintEvent() for that path.
+        """
+        pen_outline = QPen(QColor(fill_color))
+        pen_outline.setWidthF(outline_width)
+        pen_outline.setJoinStyle(Qt.RoundJoin)
+        painter.strokePath(path, pen_outline)
+        painter.strokePath(path, pen_outline)
+
+        layers     = max(1, int(st['glow_layers']))
+        max_glow_w = st['glow_max_width'] * self.scale_factor
+        base_alpha = int(st['glow_base_alpha'])
+
+        for i in range(layers):
+            frac   = i / (layers - 1) if layers > 1 else 1.0
+            w_glow = outline_width + (max_glow_w - outline_width) * frac
+            a      = int(base_alpha * (1 - frac))
+            if a <= 0:
+                continue
+
+            glow = QColor(glow_color)
+            glow.setAlpha(a)
+            pen = QPen(glow)
+            pen.setWidthF(w_glow)
+            pen.setJoinStyle(Qt.RoundJoin)
+            painter.strokePath(path, pen)
+
+        painter.fillPath(path, QColor(fill_color))
+
+    @staticmethod
+    def _build_fade_gradient(grad, offset, bx, by, samples=24):
+        offset = max(0.0, min(0.95, float(offset)))
+        bx = max(0.0, min(1.0, float(bx)))
+        by = max(0.0, min(1.0, float(by)))
+
+        # Solid hold from 0 to `offset` (mask alpha = 0 -> panel visible)
+        if offset > 0:
+            grad.setColorAt(0.0,    QColor(0, 0, 0, 0))
+            grad.setColorAt(offset, QColor(0, 0, 0, 0))
+
+        span = 1.0 - offset
+        for k in range(samples + 1):
+            t = k / samples
+            x = 2 * (1 - t) * t * bx + t * t
+            y = 2 * (1 - t) * t * by + t * t
+            pos   = offset + max(0.0, min(1.0, x)) * span
+            alpha = int(round(255 * max(0.0, min(1.0, y))))
+            grad.setColorAt(pos, QColor(0, 0, 0, alpha))
+
+        # Force exact endpoints in case sampling rounded slightly.
+        grad.setColorAt(0.0 if offset == 0 else offset, QColor(0, 0, 0, 0))
+        grad.setColorAt(1.0, QColor(0, 0, 0, 255))
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -235,40 +389,43 @@ class FramelessOverlay(QWidget):
 
         blue  = st['color_blue']
         white = st['color_white']
+        bx    = st['fade_bezier_x']
+        by    = st['fade_bezier_y']
 
-        # main background
-        painter.fillRect(0, 0, w, h, QColor(0, 0, 0, int(st['bg_alpha'])))
+        # main background — colour is user-configurable now
+        bg_qc = QColor(st['bg_color'])
+        bg_qc.setAlpha(int(st['bg_alpha']))
+        painter.fillRect(0, 0, w, h, bg_qc)
 
         # Carve transparent gradients out of the panel along each edge.
         painter.setCompositionMode(QPainter.CompositionMode_DestinationOut)
 
-        # top fade
+        # top fade — strip runs from y=0 (outside) to y=fade (inside).
+        # In our Bezier convention t=0 is the inner edge (opaque),
+        # t=1 is the outer edge (transparent), hence the gradient
+        # vector goes from (0, fade) -> (0, 0).
         fade = sx(st['fade_top'])
         if fade > 0:
-            grad = QLinearGradient(0, 0, 0, fade)
-            grad.setColorAt(0, QColor(0, 0, 0, 255))
-            grad.setColorAt(1, QColor(0, 0, 0,   0))
+            grad = QLinearGradient(0, fade, 0, 0)
+            self._build_fade_gradient(grad, st['fade_top_offset'], bx, by)
             painter.fillRect(0, 0, w, fade, grad)
         # bottom fade
         fade = sx(st['fade_bottom'])
         if fade > 0:
-            grad = QLinearGradient(0, h, 0, h - fade)
-            grad.setColorAt(0, QColor(0, 0, 0, 255))
-            grad.setColorAt(1, QColor(0, 0, 0,   0))
+            grad = QLinearGradient(0, h - fade, 0, h)
+            self._build_fade_gradient(grad, st['fade_bottom_offset'], bx, by)
             painter.fillRect(0, h - fade, w, fade, grad)
         # left fade
         fade = sx(st['fade_left'])
         if fade > 0:
-            grad = QLinearGradient(0, 0, fade, 0)
-            grad.setColorAt(0, QColor(0, 0, 0, 255))
-            grad.setColorAt(1, QColor(0, 0, 0,   0))
+            grad = QLinearGradient(fade, 0, 0, 0)
+            self._build_fade_gradient(grad, st['fade_left_offset'], bx, by)
             painter.fillRect(0, 0, fade, h, grad)
         # right fade
         fade = sx(st['fade_right'])
         if fade > 0:
-            grad = QLinearGradient(w, 0, w - fade, 0)
-            grad.setColorAt(0, QColor(0, 0, 0, 255))
-            grad.setColorAt(1, QColor(0, 0, 0,   0))
+            grad = QLinearGradient(w - fade, 0, w, 0)
+            self._build_fade_gradient(grad, st['fade_right_offset'], bx, by)
             painter.fillRect(w - fade, 0, fade, h, grad)
 
         painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
@@ -291,37 +448,19 @@ class FramelessOverlay(QWidget):
             path = QPainterPath()
             path.addText(sx(x), sx(y), font, text)
 
-            pen_outline = QPen(QColor(color))
-            pen_outline.setWidthF(outline_width)
-            pen_outline.setJoinStyle(Qt.RoundJoin)
-            painter.strokePath(path, pen_outline)
-
+            # 'QUICK CHAT' is drawn as a single thin outlined+filled label.
+            # The category header is the highlighted one — same outline,
+            # second stroke pass, blue glow underneath, then filled.
             if text == self.category_text:
-                # Second stroke pass (kept identical to original logic).
+                self._draw_glowing_text(
+                    painter, path, color, blue, outline_width, st
+                )
+            else:
                 pen_outline = QPen(QColor(color))
                 pen_outline.setWidthF(outline_width)
                 pen_outline.setJoinStyle(Qt.RoundJoin)
                 painter.strokePath(path, pen_outline)
-
-                layers     = max(1, int(st['glow_layers']))
-                max_glow_w = sf(st['glow_max_width'])
-                base_alpha = int(st['glow_base_alpha'])
-
-                for i in range(layers):
-                    frac = i / (layers - 1) if layers > 1 else 1.0
-                    w_glow = outline_width + (max_glow_w - outline_width) * frac
-                    a      = int(base_alpha * (1 - frac))
-                    if a <= 0:
-                        continue
-
-                    glow = QColor(blue)
-                    glow.setAlpha(a)
-                    pen = QPen(glow)
-                    pen.setWidthF(w_glow)
-                    pen.setJoinStyle(Qt.RoundJoin)
-                    painter.strokePath(path, pen)
-
-            painter.fillPath(path, QColor(color))
+                painter.fillPath(path, QColor(color))
 
         # Numeric labels (1..4) on the left
         nums_font_size = max(1, int(round(sf(st['nums_font_size']))))
@@ -336,26 +475,35 @@ class FramelessOverlay(QWidget):
             painter.drawText(x, y, text)
 
         # Phrase column
-        msg_font_size = max(1, int(round(sf(st['msgs_font_size']))))
-        right_padding = sx(st['right_padding'])
+        msg_font_size           = max(1, int(round(sf(st['msgs_font_size']))))
+        msg_letter_spacing      = sf(st['msgs_letter_spacing'])
+        selected_letter_spacing = sf(st['selected_letter_spacing'])
+        right_padding           = sx(st['right_padding'])
         for i in range(4):
             text = self.msgs[i]
             x = sx(st['msgs_left'])
             baseline_y = sx(st['nums_top'] + line_offset * i)
 
+            is_selected = (self.selected_index is not None and i == self.selected_index)
+
+            # Selected line: game-fixed white + heavier weight + a
+            # per-scale letter-spacing bump. Unselected: regular blue
+            # with the default weight / spacing from the style dict.
+            # NO glow, NO outline on the selected line — both are
+            # absent in the in-game quick-chat.
             font = QFont(self.number_family, msg_font_size)
-            if self.selected_index is not None and i == self.selected_index:
-                font.setWeight(int(self.selected_weight))
+            if is_selected:
+                font.setLetterSpacing(QFont.AbsoluteSpacing, selected_letter_spacing)
+                font.setWeight(SELECTED_WEIGHT)
             else:
+                font.setLetterSpacing(QFont.AbsoluteSpacing, msg_letter_spacing)
                 font.setWeight(int(st['msgs_font_weight']))
             painter.setFont(font)
-            if self.selected_index is not None and i == self.selected_index:
-                painter.setPen(QColor(self.selected_color))
-            else:
-                painter.setPen(QColor(blue))
             fm = painter.fontMetrics()
             max_width = self.width() - x - right_padding
             single_line = fm.elidedText(text, Qt.ElideRight, max_width)
+
+            painter.setPen(QColor(SELECTED_COLOR) if is_selected else QColor(blue))
             painter.drawText(x, baseline_y, single_line)
 
 
