@@ -260,6 +260,12 @@ All of these were addressed earlier — kept here as a changelog:
   phase (`_input_subsystem_warmup` in `RLQuickChat.py`) and
   applying a longer cold-path sleep on the very first
   `paste_in_chat()`.
+- Phrase / training-code picking switched from naive
+  `random.choice()` to a `ShuffleBag` (`pseudo_random.py`) —
+  shuffle, walk through the pool, reshuffle on exhaustion, guard
+  the seam. Same statistical fairness, but no back-to-back
+  repeats so the user perceives the variety they expected when
+  they wrote N phrases for a single chord.
 
 ---
 

@@ -21,10 +21,13 @@ the menu looks like it was always part of the game.
 - **Same input as the game.** 4-button system + reset-on-delay,
   so muscle memory carries over.
 - **Multiple variants per shortcut.** A given chord (e.g. `1-1`)
-  can hold any number of phrases; one is picked at random.
+  can hold any number of phrases; picking is shuffle-bag style
+  ("non-repeating random") so you don't see the same phrase
+  twice in a row even when a chord only has a handful of options.
 - **Randomised in-message tokens.** Training-map codes etc. are
-  substituted from a pool at send time so the same message looks
-  fresh every time.
+  substituted from a pool at send time, also via shuffle-bag, so
+  the same template stays fresh and won't echo the same code
+  back-to-back.
 - **Pixel-matched overlay.** The on-screen quick-chat menu is
   rendered by us, calibrated against the in-game UI down to the
   edge fades and the selected-line highlight. Fully tunable —
@@ -319,6 +322,10 @@ TODO.md. Headline changes since the last release:
 - [x] **Random-token substitution** in messages
       (`{shooting_code}` / `{defence_code}`) so variants no
       longer require a brute-force list per code.
+- [x] **Shuffle-bag phrase / code picking** (`pseudo_random.py`)
+      — replaces naive `random.choice()`; perceived as random,
+      never repeats the same value back-to-back, even across
+      reshuffles.
 - [x] **Preflight + auto-detect Rocket League bindings**
       (`rl_config.py`, `preflight.py`) — reads `TAInput.ini` and
       `TASystemSettings.ini`, auto-applies the detected keys, and

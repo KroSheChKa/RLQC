@@ -5,7 +5,6 @@ from win32api import keybd_event
 from pynput.keyboard import Controller, Key, KeyCode
 from config import *
 from lang_determ import *
-from random import choice
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QMessageBox
 from visuals import FramelessOverlay
@@ -13,6 +12,7 @@ from preflight import (
     run_preflight, PreflightReport,
     dismissed_warning_ids, dismiss_warnings,
 )
+from pseudo_random import ShuffleBag
 import win32gui
 import win32con
 
@@ -158,25 +158,58 @@ def overlay_hide(duration_ms=200):
 # Message rendering
 # ----------------------
 # Phrases in config.py may contain placeholders such as {shooting_code}
-# or {defence_code}. We substitute a random code from the corresponding
-# pool right before showing/sending the message. Missing/unknown
+# or {defence_code}. We substitute a code from the corresponding pool
+# right before showing/sending the message. Missing/unknown
 # placeholders are left as empty strings instead of crashing.
+#
+# Picking strategy: ShuffleBag (see pseudo_random.py). Plain
+# random.choice() on a 5-item list yields a same-as-last result
+# ~20% of the time, which feels lame for the user. ShuffleBag
+# shuffles the pool, walks through it, reshuffles on exhaustion,
+# and guards the seam — perceived as random, never repeats.
+#
+# `_bags` caches one bag per logical pool so the cycle state
+# survives across calls. Lazy creation on first use so unused
+# chords don't allocate.
 class _DefaultDict(dict):
     """dict.format_map helper: unknown placeholders become empty strings."""
     def __missing__(self, key):
         return ''
 
 
-def _safe_choice(seq):
-    return choice(seq) if seq else ''
+_bags: dict = {}
+
+
+def _bag_for(key, items):
+    """Return the cached ShuffleBag for `key`, creating it on demand."""
+    bag = _bags.get(key)
+    if bag is None:
+        bag = ShuffleBag(items)
+        _bags[key] = bag
+    return bag
+
+
+def _pick_phrase(category_idx, subcat_idx):
+    """Yield the next phrase template for the given chord, shuffle-bag style."""
+    options = quick_chat_messages[category_idx][subcat_idx]
+    if not options:
+        return ''
+    return _bag_for(('phrase', category_idx, subcat_idx), options).next() or ''
+
+
+def _pick_code(pool_name, pool):
+    """Yield the next training-map code from the given pool."""
+    if not pool:
+        return ''
+    return _bag_for(('code', pool_name), pool).next() or ''
 
 
 def render_message(template):
     if not isinstance(template, str) or '{' not in template:
         return template
     mapping = {
-        'shooting_code': _safe_choice(shooting_training_map_codes),
-        'defence_code':  _safe_choice(defence_training_map_codes),
+        'shooting_code': _pick_code('shooting', shooting_training_map_codes),
+        'defence_code':  _pick_code('defence',  defence_training_map_codes),
     }
     try:
         return template.format_map(_DefaultDict(mapping))
@@ -199,13 +232,13 @@ def render_message(template):
 
 # Expecting a second click after the first
 def second_click(first_click):
-    # Pick a random phrase per sub-category and render any
-    # {shooting_code}/{defence_code} placeholders right away so that the
-    # overlay shows exactly the same text that will be typed.
+    # Pick a phrase per sub-category (ShuffleBag — see render_message's
+    # _pick_phrase helper) and render any {shooting_code}/{defence_code}
+    # placeholders right away, so that the overlay shows exactly the
+    # same text that will be typed into chat.
     overlay_msgs = []
     for sub_idx in range(4):
-        options = quick_chat_messages[first_click][sub_idx]
-        overlay_msgs.append(render_message(choice(options) if options else ''))
+        overlay_msgs.append(render_message(_pick_phrase(first_click, sub_idx)))
 
     # Show overlay for the chosen category with pre-selected messages and start the timer
     overlay_show_for_category(first_click, overlay_msgs)
