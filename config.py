@@ -315,9 +315,19 @@ else:
     # too — and the menu will look 1:1 with the in-game quick chat.
     #
     # NOTE: this is NOT the Windows display scaling (the 100/125/150%
-    # setting in Windows). That one is handled by the OS automatically
-    # because this script intentionally runs as a non-DPI-aware app, so
-    # whatever you see in the game is what you get here as well.
+    # setting in Windows). The Windows scale is intentionally ignored
+    # — both RLQuickChat.py and tuner.py call
+    # `QApplication.setAttribute(Qt.AA_DisableHighDpiScaling, True)`
+    # before creating their QApplication, which makes Qt render at
+    # raw physical pixels regardless of the OS scale slider. We do
+    # this because Rocket League itself also ignores the Windows
+    # scale, so the overlay must follow suit: a preset calibrated at
+    # 100% Windows scaling must look identical at 125% / 150%.
+    #
+    # The detected Windows scale IS still recorded in every tuner
+    # preset (see tuner.py::detect_environment) so that the future
+    # auto-adaptation work in TODO.md #2 has the data parked and
+    # ready, even though we currently apply it nowhere.
     INTERFACE_SCALE = 100
 
     # Anchor of the overlay rectangle, in DESIGN pixels — i.e. pixels

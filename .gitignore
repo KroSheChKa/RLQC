@@ -12,6 +12,10 @@ __pycache__/
 .idea/
 .cursor/
 
+# Per-user RLQC state (e.g. dismissed preflight warnings).
+# Regenerated on demand; never share-worthy.
+.rlqc_state.json
+
 # OS junk
 Thumbs.db
 .DS_Store
