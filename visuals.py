@@ -130,6 +130,60 @@ class FramelessOverlay(QWidget):
 
         # right-side padding used for eliding long phrases
         'right_padding': 26,
+
+        # ------------------------------------------------------------
+        # Per-text-region letter-spacing scaling exponents.
+        # ------------------------------------------------------------
+        # Almost every dimension here scales linearly with HUD scale
+        # (size_eff = size × scale_factor). Empirically though,
+        # Rocket League's in-game text does NOT scale its letter-
+        # spacing uniformly with HUD scale, and the deviation from
+        # linear is different for each text region (header, category,
+        # phrases). We model each region with its own power-law
+        # exponent:
+        #
+        #     LS_effective = LS_base × scale_factor ** exponent
+        #
+        #     exponent  > 1.0   →  LS shrinks FASTER than linear at
+        #                          low HUD scales (text gets tighter)
+        #     exponent == 1.0   →  linear (LS proportional to font)
+        #     exponent  < 1.0   →  LS shrinks SLOWER than linear
+        #     exponent == 0.0   →  LS is HUD-independent / constant
+        #                          pixels regardless of font size.
+        #                          This is the apparent model RL uses
+        #                          for the phrase rows — letters keep
+        #                          a fixed gap no matter the HUD.
+        #
+        # At scale_factor == 1.0 any exponent collapses to identity
+        # (1**p == 1), so the HUD=100 calibration is preserved no
+        # matter what value goes here.
+        #
+        # The defaults below were fit from a HUD=75 visual-match
+        # calibration on a 3440x1440 / `_new_background` reference
+        # preset (the HUD=50 first-pass values turned out to be
+        # eyeball-noisy because the LS differences are sub-pixel at
+        # that scale; HUD=75 gave a much sharper reading):
+        #
+        #     header1:  LS 2.3 (HUD=100) → rendered 1.99 @ HUD=75 → p ≈ 0.51
+        #     header2:  LS 2.6           → rendered 1.84 @ HUD=75 → p ≈ 1.24
+        #     msgs:     LS 0.8 (constant in px across HUDs)       → p = 0.0
+        #     selected: LS 0.6 (constant in px across HUDs)       → p = 0.0
+        #
+        # Both phrase rows (msgs + selected) end up with p = 0.0:
+        # RL apparently uses a fixed pixel kerning for the phrase
+        # column, independent of HUD scale. The numeric value
+        # differs (0.8 vs 0.6) because the selected line is bold,
+        # so a slightly tighter spacing keeps letters from looking
+        # squashed.
+        #
+        # If you collect a new measurement at HUD = h with rendered
+        # letter-spacing LS_h, the matching exponent is:
+        #
+        #     p = log(LS_h / LS_base) / log(h / 100)
+        'header1_ls_scale_exponent':  0.51,
+        'header2_ls_scale_exponent':  1.24,
+        'msgs_ls_scale_exponent':     0.0,
+        'selected_ls_scale_exponent': 0.0,
     }
 
     def __init__(self, windows_params, scale=1.0, style=None):
@@ -384,8 +438,20 @@ class FramelessOverlay(QWidget):
         s = self.scale_factor
         def sx(v):  # integer pixel coordinate / length
             return int(round(v * s))
-        def sf(v):  # float quantity (font sizes, pen widths, letter spacing)
+        def sf(v):  # float quantity (font sizes, pen widths, etc.)
             return v * s
+
+        # Letter-spacing gets a per-region helper because RL's text
+        # scales LS non-linearly with HUD scale, and the exponent is
+        # different for headers vs. category vs. phrases (see the
+        # *_ls_scale_exponent block in DEFAULT_STYLE for the data
+        # and derivation). At scale_factor == 1.0 every exponent
+        # collapses to identity, so the HUD=100 calibration is
+        # preserved no matter what these are set to.
+        def ls_for(value, exp_key):
+            p = float(st.get(exp_key, 1.0))
+            factor = (s ** p) if s > 0 else 1.0
+            return value * factor
 
         blue  = st['color_blue']
         white = st['color_white']
@@ -430,19 +496,23 @@ class FramelessOverlay(QWidget):
 
         painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
 
-        # (text, color, (x, y), font_size, letter_spacing) in design pixels
+        # (text, color, (x, y), font_size, letter_spacing, ls_exp_key)
+        # all in design pixels. ls_exp_key picks the right per-region
+        # letter-spacing scaling exponent from the style dict.
         headers = [
             ('QUICK CHAT',       blue,  (st['header1_x'], st['header1_y']),
-             st['header1_font_size'], st['header1_letter_spacing']),
+             st['header1_font_size'], st['header1_letter_spacing'],
+             'header1_ls_scale_exponent'),
             (self.category_text, white, (st['header2_x'], st['header2_y']),
-             st['header2_font_size'], st['header2_letter_spacing']),
+             st['header2_font_size'], st['header2_letter_spacing'],
+             'header2_ls_scale_exponent'),
         ]
 
         outline_width = sf(st['outline_width'])
 
-        for text, color, (x, y), size, spacing in headers:
+        for text, color, (x, y), size, spacing, ls_key in headers:
             font = QFont(self.header_family, max(1, int(round(sf(size)))))
-            font.setLetterSpacing(QFont.AbsoluteSpacing, sf(spacing))
+            font.setLetterSpacing(QFont.AbsoluteSpacing, ls_for(spacing, ls_key))
             painter.setFont(font)
 
             path = QPainterPath()
@@ -476,8 +546,10 @@ class FramelessOverlay(QWidget):
 
         # Phrase column
         msg_font_size           = max(1, int(round(sf(st['msgs_font_size']))))
-        msg_letter_spacing      = sf(st['msgs_letter_spacing'])
-        selected_letter_spacing = sf(st['selected_letter_spacing'])
+        msg_letter_spacing      = ls_for(st['msgs_letter_spacing'],
+                                         'msgs_ls_scale_exponent')
+        selected_letter_spacing = ls_for(st['selected_letter_spacing'],
+                                         'selected_ls_scale_exponent')
         right_padding           = sx(st['right_padding'])
         for i in range(4):
             text = self.msgs[i]

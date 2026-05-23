@@ -23,22 +23,39 @@ What it does:
     * Reads/writes presets to overlay_presets.json next to this file.
 
 Workflow you are expected to follow:
-    1. Open Rocket League. Set HUD scale to e.g. 100%.
+    1. Open Rocket League. Set HUD scale to 100%.
     2. Run this tuner. The live overlay shows up where the main script
        would put it.
     3. Tweak sliders until the overlay matches the in-game quick chat
-       pixel-by-pixel.
-    4. Fill in "Game HUD scale" (the value you set in step 1), give the
-       preset a name, hit "Save preset".
-    5. Change HUD scale in the game, alt-tab back, tweak again, save
-       another preset. Repeat for a few HUD-scale values.
+       pixel-by-pixel. Save as a preset (this becomes your HUD=100
+       baseline).
+    4. To test how the SAME baseline should look at lower HUD scales,
+       drag the "HUD scale" slider (the one in the "Scale" group) from
+       100 down to, say, 75. The overlay re-renders at 75% of the
+       baseline — both contents AND the window box shrink, anchored
+       to the bottom-left corner (because that's where RL parks its
+       chat panel).
+    5. Alt-tab into RL, change the in-game HUD scale to the same value
+       and compare side-by-side. Any pixel-level discrepancy at lower
+       HUD scales is data for TODO #2 (the auto-adaptation formula).
     6. (Optional) change Windows display scale or run on another
        resolution and repeat. The more data points, the better the
        automatic adaptation formula can be.
+
+Notes:
+    * Slider values for window geometry and everything inside the
+      style are interpreted as DESIGN PIXELS at HUD = 100%. The HUD
+      scale slider applies a single multiplier at render time. So you
+      only ever calibrate at 100% — testing other HUD scales is a
+      read-only operation on the same baseline.
+    * Font WEIGHTS, COLOURS and the BEZIER curve shape are
+      deliberately not scaled by HUD — they describe the look of the
+      overlay, not its size.
 """
 
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 import sys
@@ -89,13 +106,34 @@ PRESETS_PATH = os.path.join(os.path.dirname(__file__), "overlay_presets.json")
 # -----------------------------------------------------------------------------
 PARAMS = [
     # ---- Window geometry (NOT in self.style — handled separately) ----
+    #
+    # `left`/`top`/`width`/`height` are design pixels at HUD=100%
+    # (i.e. the values that apply when `interface_scale` is 100).
+    #
+    # `anchor_x`/`anchor_y` describe a screen-fixed point that the
+    # window collapses TOWARD as HUD shrinks. The effective position
+    # at HUD scale `s` is the affine blend:
+    #
+    #     pos_eff = anchor + (design - anchor) * s
+    #
+    # At HUD=100 the anchor has zero effect (s=1 → pos = design).
+    # At HUD=0 the position would be exactly (anchor_x, anchor_y).
+    # Empirically RL's chat doesn't anchor at the corner (0,0): at
+    # 3440x1440 the user-observed anchor sits at roughly (0, 410).
+    # See `_effective_geometry` in TunerWindow for the math.
     ("Window", "left",        "Window X (px)",          int, -8000, 8000, 1),
     ("Window", "top",         "Window Y (px)",          int, -8000, 8000, 1),
     ("Window", "width",       "Window width (px)",      int,    50, 3000, 1),
     ("Window", "height",      "Window height (px)",     int,    50, 3000, 1),
+    ("Window", "anchor_x",    "X anchor at HUD=0 (px)", int, -2000, 8000, 1),
+    ("Window", "anchor_y",    "Y anchor at HUD=0 (px)", int, -2000, 8000, 1),
 
-    # ---- Global scale (applies to every drawn dimension) ----
-    ("Scale", "interface_scale", "INTERFACE_SCALE (%)", int,   30,  200, 1),
+    # ---- Global HUD scale (simulates Rocket League's in-game HUD
+    # ----  scale slider; in RL the same knob ranges 50..100). The
+    # ----  range here is widened to 30..200 only as a sanity head-
+    # ----  room for experimentation — in-game RL never goes below
+    # ----  50 or above 100.
+    ("Scale", "interface_scale", "HUD scale (%)", int, 30, 200, 1),
 
     # ---- Background panel & edge fade ----
     ("Background",  "bg_alpha",          "Background alpha (0..255)", int,   0,   255, 1),
@@ -113,16 +151,21 @@ PARAMS = [
     ("Fade curve (Bezier)", "fade_bezier_y", "Control Y (0..1)", float, 0.0, 1.0, 0.01),
 
     # ---- 'QUICK CHAT' header ----
-    ("Header 'QUICK CHAT'", "header1_x",              "X (px)",          int,   0,  400, 1),
-    ("Header 'QUICK CHAT'", "header1_y",              "Y (px)",          int,   0,  400, 1),
-    ("Header 'QUICK CHAT'", "header1_font_size",      "Font size (pt)",  float, 1.0, 80.0, 0.5),
-    ("Header 'QUICK CHAT'", "header1_letter_spacing", "Letter spacing",  float, 0.0, 10.0, 0.1),
+    # `*_ls_scale_exponent` controls how letter-spacing shrinks with
+    # HUD scale (RL doesn't scale LS linearly — see visuals.py for
+    # the math). At HUD=100 this slider does nothing visible.
+    ("Header 'QUICK CHAT'", "header1_x",                  "X (px)",                int,   0,    400,  1),
+    ("Header 'QUICK CHAT'", "header1_y",                  "Y (px)",                int,   0,    400,  1),
+    ("Header 'QUICK CHAT'", "header1_font_size",          "Font size (pt)",        float, 1.0,  80.0, 0.5),
+    ("Header 'QUICK CHAT'", "header1_letter_spacing",     "Letter spacing",        float, 0.0,  10.0, 0.1),
+    ("Header 'QUICK CHAT'", "header1_ls_scale_exponent",  "LS scale exponent",     float, 0.0,  5.0,  0.01),
 
     # ---- Category header (e.g. COMPLIMENTS) ----
-    ("Header category", "header2_x",              "X (px)",          int,   0,  400, 1),
-    ("Header category", "header2_y",              "Y (px)",          int,   0,  400, 1),
-    ("Header category", "header2_font_size",      "Font size (pt)",  float, 1.0, 80.0, 0.5),
-    ("Header category", "header2_letter_spacing", "Letter spacing",  float, 0.0, 10.0, 0.1),
+    ("Header category", "header2_x",                  "X (px)",                int,   0,    400,  1),
+    ("Header category", "header2_y",                  "Y (px)",                int,   0,    400,  1),
+    ("Header category", "header2_font_size",          "Font size (pt)",        float, 1.0,  80.0, 0.5),
+    ("Header category", "header2_letter_spacing",     "Letter spacing",        float, 0.0,  10.0, 0.1),
+    ("Header category", "header2_ls_scale_exponent",  "LS scale exponent",     float, 0.0,  5.0,  0.01),
 
     # ---- Outline + glow around the category header ----
     ("Glow & outline", "outline_width",  "Outline width (px)", float, 0.0, 10.0, 0.1),
@@ -137,17 +180,20 @@ PARAMS = [
     ("Numbers (1..4)", "nums_font_weight", "Font weight",     int,   1,   99,  1),
 
     # ---- Phrase column ----
-    ("Phrases", "msgs_left",            "X (px)",            int,   0,   600, 1),
-    ("Phrases", "msgs_font_size",       "Font size (pt)",    float, 1.0, 80.0, 0.5),
-    ("Phrases", "msgs_font_weight",     "Font weight",       int,   1,   99,  1),
-    ("Phrases", "msgs_letter_spacing",  "Letter spacing",    float, 0.0, 10.0, 0.1),
-    ("Phrases", "right_padding",        "Right padding (px)",int,   0,   400, 1),
+    ("Phrases", "msgs_left",                "X (px)",            int,   0,    600,  1),
+    ("Phrases", "msgs_font_size",           "Font size (pt)",    float, 1.0,  80.0, 0.5),
+    ("Phrases", "msgs_font_weight",         "Font weight",       int,   1,    99,   1),
+    ("Phrases", "msgs_letter_spacing",      "Letter spacing",    float, 0.0,  10.0, 0.1),
+    ("Phrases", "msgs_ls_scale_exponent",   "LS scale exponent", float, 0.0,  5.0,  0.01),
+    ("Phrases", "right_padding",            "Right padding (px)",int,   0,    400,  1),
 
     # ---- Selected phrase (row #2 is pinned selected in the tuner preview) ----
     # Only letter-spacing is tunable: colour (white) and weight (bold)
     # are dictated by the game itself — see SELECTED_COLOR /
-    # SELECTED_WEIGHT in visuals.py for the rationale.
-    ("Selected phrase", "selected_letter_spacing", "Letter spacing", float, 0.0, 20.0, 0.1),
+    # SELECTED_WEIGHT in visuals.py for the rationale. The exponent
+    # below mirrors the per-region exponents on the other text rows.
+    ("Selected phrase", "selected_letter_spacing",     "Letter spacing",    float, 0.0,  20.0, 0.1),
+    ("Selected phrase", "selected_ls_scale_exponent",  "LS scale exponent", float, 0.0,  5.0,  0.01),
 
     # ---- Row spacing ----
     ("Rows", "line_offset", "Line offset (px)", int, 1, 200, 1),
@@ -155,8 +201,12 @@ PARAMS = [
 
 
 # Keys that should NOT be merged into FramelessOverlay.style — they
-# either live elsewhere (window geometry) or are meta-controls.
-GEOMETRY_KEYS = {"left", "top", "width", "height"}
+# either live elsewhere (window geometry / anchor) or are meta-controls.
+# `anchor_x`/`anchor_y` are tuner-only — they govern HOW the design
+# left/top get projected to actual screen pixels at any HUD scale,
+# but the overlay itself never sees them; only the resolved
+# `left/top/width/height` are passed to `set_geometry_dict`.
+GEOMETRY_KEYS = {"left", "top", "width", "height", "anchor_x", "anchor_y"}
 META_KEYS     = {"interface_scale"}
 
 
@@ -329,11 +379,47 @@ class ColorControl(QWidget):
 # -----------------------------------------------------------------------------
 # Environment detection
 # -----------------------------------------------------------------------------
+def _query_windows_scale_percent():
+    """Read the OS display-scale percent (100, 125, 150, ...) directly
+    from Windows, independently of the Qt app's DPI awareness.
+
+    We intentionally run the tuner / overlay with Qt HiDPI scaling
+    disabled (so the overlay renders at physical pixel size, like
+    Rocket League does). With Qt scaling off, `screen.logicalDotsPerInch`
+    always returns 96 — so we can't get the real Windows scale that way.
+    Asking shcore.GetDpiForMonitor works regardless of process awareness.
+
+    Returns 100 if anything goes wrong, so callers don't have to care
+    about platform differences.
+    """
+    try:
+        user32 = ctypes.windll.user32
+        shcore = ctypes.windll.shcore
+        # MONITOR_DEFAULTTOPRIMARY = 1; MDT_EFFECTIVE_DPI = 0
+        hmon = user32.MonitorFromWindow(user32.GetDesktopWindow(), 1)
+        dpi_x = ctypes.c_uint(0)
+        dpi_y = ctypes.c_uint(0)
+        hr = shcore.GetDpiForMonitor(hmon, 0,
+                                     ctypes.byref(dpi_x), ctypes.byref(dpi_y))
+        if hr == 0 and dpi_x.value:
+            return int(round(dpi_x.value / 96.0 * 100))
+    except Exception:
+        pass
+    return 100
+
+
 def detect_environment():
     """Collect everything we know about the current display setup.
 
     Stored alongside every preset so that the data is enough to later
     fit an adaptation formula across (resolution, HUD scale, DPI).
+
+    NOTE on windows_scale_percent: this value is currently *recorded
+    only* — neither the overlay nor the tuner uses it to size anything.
+    We disabled Qt HiDPI scaling on purpose so the overlay tracks the
+    game (which also ignores Windows scaling). The field is kept in
+    the JSON so a future auto-adaptation pass (see TODO #2) has the
+    data without us having to recapture every preset.
     """
     screen = QApplication.primaryScreen()
     geom = screen.geometry()
@@ -350,7 +436,9 @@ def detect_environment():
     except Exception:
         logical_dpi = physical_dpi = 96.0
 
-    windows_scale_percent = int(round(logical_dpi / 96.0 * 100))
+    # Ask Windows directly; Qt's logical DPI is virtualised to 96
+    # whenever AA_DisableHighDpiScaling is set (which we do in main()).
+    windows_scale_percent = _query_windows_scale_percent()
 
     return {
         "resolution":           [geom.width(), geom.height()],
@@ -400,11 +488,16 @@ class TunerWindow(QWidget):
 
         # Current values for everything the user can edit. Seeded from
         # the running overlay and the OVERLAY_POSITION constant.
+        # `anchor_x`/`anchor_y` default to 0 (= pure linear scaling of
+        # position with HUD) so legacy presets without those keys
+        # behave exactly like before this change.
         self.values = {
             "left":   OVERLAY_POSITION["left"],
             "top":    OVERLAY_POSITION["top"],
             "width":  OVERLAY_POSITION["width"],
             "height": OVERLAY_POSITION["height"],
+            "anchor_x": int(OVERLAY_POSITION.get("anchor_x", 0)),
+            "anchor_y": int(OVERLAY_POSITION.get("anchor_y", 0)),
             "interface_scale": int(DEFAULT_INTERFACE_SCALE),
         }
         self.values.update(self.overlay.style)
@@ -487,10 +580,38 @@ class TunerWindow(QWidget):
             "Background": [("bg_color", "Panel colour")],
         }
 
+        # Optional short intro shown above the controls of a group.
+        # Explains semantics that aren't obvious from the slider
+        # labels alone (e.g. "design pixels at HUD=100%").
+        group_intros = {
+            "Window": (
+                "Values below are <b>design pixels at HUD = 100%</b>. "
+                "When the HUD-scale slider is at a different value, "
+                "the live overlay is rendered at <code>design × HUD/100</code>, "
+                "collapsing toward the <b>bottom-left</b> corner — same "
+                "anchor RL uses for its chat panel."
+            ),
+            "Scale": (
+                "Simulates Rocket League's in-game HUD scale (50..100% in RL). "
+                "Pulls down BOTH the contents AND the window box by the same "
+                "factor. Font weights, colours and the Bezier curve shape are "
+                "<i>not</i> scaled — they describe the look, not the size."
+            ),
+        }
+
         for gname, items in groups.items():
             gb = QGroupBox(gname)
             form = QVBoxLayout(gb)
             form.setSpacing(4)
+
+            intro = group_intros.get(gname)
+            if intro:
+                lbl = QLabel(intro)
+                lbl.setWordWrap(True)
+                lbl.setStyleSheet(
+                    "QLabel { color: #555; padding: 2px 0 4px 0; }"
+                )
+                form.addWidget(lbl)
 
             for key, label in group_colors.get(gname, []):
                 color_ctrl = ColorControl(
@@ -593,14 +714,55 @@ class TunerWindow(QWidget):
         if self.live_apply.isChecked():
             self._apply_overlay_values(linked_partial)
 
+    # ----- HUD-scale-aware geometry -----
+    def _effective_geometry(self):
+        """Compute the live window rect from the stored design values.
+
+        Width/height scale linearly with HUD:
+
+            size_eff = size_design * scale
+
+        Position (`left`/`top`) follows an affine blend toward a
+        screen-fixed anchor:
+
+            pos_eff = anchor + (design - anchor) * scale
+
+        At HUD=100 (scale=1.0) `pos_eff == design`. At HUD=0 the
+        position would be exactly `(anchor_x, anchor_y)`. The anchor
+        is the screen point toward which the overlay shrinks — RL's
+        chat panel doesn't collapse toward (0,0) at low HUD, it
+        collapses toward roughly (0, ~410 at 3440x1440), so the
+        anchor is per-preset and tunable in the Window group.
+
+        Defaults `anchor = (0, 0)` reduce the formula to pure linear
+        scaling, which is the safe starting point if no measurement
+        is available yet.
+        """
+        scale = max(0.01, float(self.values.get("interface_scale", 100)) / 100.0)
+        dw = int(self.values["width"])
+        dh = int(self.values["height"])
+        dl = int(self.values["left"])
+        dt = int(self.values["top"])
+        ax = int(self.values.get("anchor_x", 0))
+        ay = int(self.values.get("anchor_y", 0))
+
+        ew = max(1, int(round(dw * scale)))
+        eh = max(1, int(round(dh * scale)))
+        el = int(round(ax + (dl - ax) * scale))
+        et = int(round(ay + (dt - ay) * scale))
+        return {"left": el, "top": et, "width": ew, "height": eh}
+
     def _apply_overlay_values(self, partial):
         """Apply a partial dict of values to the live overlay."""
-        # geometry update
-        geo_changed = any(k in partial for k in GEOMETRY_KEYS)
-        if geo_changed:
-            self.overlay.set_geometry_dict({k: self.values[k] for k in GEOMETRY_KEYS})
+        geo_changed   = any(k in partial for k in GEOMETRY_KEYS)
+        scale_changed = "interface_scale" in partial
 
-        if "interface_scale" in partial:
+        # Window geometry depends on BOTH design size and HUD scale,
+        # so a change to either re-projects the rect.
+        if geo_changed or scale_changed:
+            self.overlay.set_geometry_dict(self._effective_geometry())
+
+        if scale_changed:
             self.overlay.set_scale(self.values["interface_scale"] / 100.0)
 
         style_updates = {
@@ -771,6 +933,20 @@ def _force_topmost(qwidget):
 
 
 def main():
+    # Opt out of Qt's automatic HiDPI scaling BEFORE QApplication is
+    # constructed. Rocket League's quick-chat ignores the Windows
+    # display-scale slider entirely (100% vs 125% vs 150% — the game
+    # always renders at native pixel size). The tuner has to match
+    # that behaviour, otherwise every preset would be specific to one
+    # particular Windows scale and a user with 125% would calibrate
+    # an overlay that doesn't match what they see in-game.
+    #
+    # We still RECORD windows_scale_percent in each preset (via
+    # _query_windows_scale_percent, which talks to Windows directly),
+    # because once the auto-adaptation in TODO #2 is in place we may
+    # want to bring it back into the scaling formula.
+    QApplication.setAttribute(Qt.AA_DisableHighDpiScaling, True)
+
     # Build the application BEFORE creating any QScreen-dependent
     # things (e.g. detect_environment uses QApplication.primaryScreen).
     app = QApplication(sys.argv)
